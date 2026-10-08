@@ -8,6 +8,9 @@ class AppConstants {
   // Hotspot clustering radius in meters (50 m)
   static const double hotspotClusterRadiusMeters = 50.0;
 
+  // Municipal Administrator Authorization Passkey
+  static const String municipalAdminPasskey = 'CIVIC-ADMIN-2026';
+
   static const List<String> categories = [
     'Pothole',
     'Garbage',

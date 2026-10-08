@@ -222,7 +222,7 @@ class _ComplaintDetailsScreenState extends State<ComplaintDetailsScreen> {
   Widget build(BuildContext context) {
     final statusColor = _getStatusColor(_complaint.status);
     final priorityColor = _getPriorityColor(_complaint.priorityLevel);
-    final currentUserId = _complaintRepository.client.auth.currentUser?.id;
+    final currentUserId = _complaintRepository.currentUserId;
     final isOwner = currentUserId != null && _complaint.userId == currentUserId;
 
     return Scaffold(
@@ -640,7 +640,6 @@ class _ComplaintDetailsScreenState extends State<ComplaintDetailsScreen> {
                     ),
                     const SizedBox(height: 16),
                   ],
-                ],
                 if (isOwner) ...[
                   const SizedBox(height: 20),
                   SizedBox(
@@ -663,10 +662,11 @@ class _ComplaintDetailsScreenState extends State<ComplaintDetailsScreen> {
                     ),
                   ),
                 ],
-              ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
+      ),
       ),
     );
   }

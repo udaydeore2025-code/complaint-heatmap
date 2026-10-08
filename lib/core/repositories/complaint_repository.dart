@@ -23,6 +23,14 @@ class ComplaintRepository {
 
   SupabaseClient get client => clientOverride ?? SupabaseService.client;
 
+  String? get currentUserId {
+    try {
+      return client.auth.currentUser?.id;
+    } catch (_) {
+      return null;
+    }
+  }
+
   static const List<String> categories = [
     'All',
     'Pothole',

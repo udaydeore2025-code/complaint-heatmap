@@ -6,7 +6,6 @@ import '../../../core/repositories/complaint_repository.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../complaints/screens/my_complaints_screen.dart';
 import '../../map/screens/complaint_map_screen.dart';
-import '../../admin/screens/admin_dashboard_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   final UserProfile profile;
@@ -225,64 +224,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           builder: (ctx) => ComplaintMapScreen(complaintRepository: _complaintRepo),
                         ),
                       );
-                    },
-                  ),
-                  const Divider(height: 1),
-                  ListTile(
-                    leading: const Icon(Icons.admin_panel_settings_outlined, color: AppTheme.priorityCritical),
-                    title: const Text('Admin Console', style: TextStyle(fontWeight: FontWeight.w600)),
-                    subtitle: const Text('Access municipal priority queue & reviews'),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () async {
-                      if (!widget.profile.isAdmin) {
-                        final confirm = await showDialog<bool>(
-                          context: context,
-                          builder: (ctx) => AlertDialog(
-                            title: const Text('Activate Admin Access?'),
-                            content: Text(
-                              'Do you want to switch your account (${widget.profile.email}) to the municipal Administrator role?',
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(ctx, false),
-                                child: const Text('Cancel'),
-                              ),
-                              ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF0F172A),
-                                  foregroundColor: Colors.white,
-                                ),
-                                onPressed: () => Navigator.pop(ctx, true),
-                                child: const Text('Confirm & Switch'),
-                              ),
-                            ],
-                          ),
-                        );
-                        if (confirm == true) {
-                          await _authRepo.updateUserRole(widget.profile.id, 'admin');
-                          if (!context.mounted) return;
-                          final updatedProfile = widget.profile.copyWith(role: 'admin');
-                          Navigator.pushReplacement(
-                            context,
-                            MaterialPageRoute(
-                              builder: (ctx) => AdminDashboardScreen(
-                                profile: updatedProfile,
-                                authRepository: _authRepo,
-                              ),
-                            ),
-                          );
-                        }
-                      } else {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (ctx) => AdminDashboardScreen(
-                              profile: widget.profile,
-                              authRepository: _authRepo,
-                            ),
-                          ),
-                        );
-                      }
                     },
                   ),
                 ],

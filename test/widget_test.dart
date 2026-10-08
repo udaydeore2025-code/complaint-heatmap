@@ -91,6 +91,16 @@ class FakeComplaintRepository extends ComplaintRepository {
     ];
   }
 
+  String? deletedComplaintId;
+
+  @override
+  String? get currentUserId => 'user-123';
+
+  @override
+  Future<void> deleteComplaint(String complaintId) async {
+    deletedComplaintId = complaintId;
+  }
+
   @override
   Future<UserCivicStats> fetchUserStats() async {
     return const UserCivicStats(
@@ -459,5 +469,185 @@ void main() {
     expect(find.text('Upvotes'), findsOneWidget);
     expect(find.text('My Reported Issues'), findsOneWidget);
     expect(find.text('Civic Map'), findsOneWidget);
+  });
+
+  testWidgets('MyComplaintsScreen can delete a complaint via confirmation dialog', (WidgetTester tester) async {
+    final fakeRepo = FakeComplaintRepository();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MyComplaintsScreen(
+          complaintRepository: fakeRepo,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Streetlight is broken near park entrance.'), findsOneWidget);
+    final deleteBtn = find.byIcon(Icons.delete_outline);
+    expect(deleteBtn, findsOneWidget);
+
+    await tester.tap(deleteBtn);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Delete Complaint?'), findsOneWidget);
+    expect(find.text('Delete'), findsOneWidget);
+
+    await tester.tap(find.text('Delete'));
+    await tester.pumpAndSettle();
+
+    expect(fakeRepo.deletedComplaintId, 'my-comp-1');
+  });
+
+  test('Highest priority complaint sorting places maximum score complaint at the top', () {
+    final list = [
+      Complaint(
+        id: '1',
+        userId: 'u1',
+        category: 'Streetlight',
+        description: 'Low prio',
+        latitude: 18.0,
+        longitude: 73.0,
+        severity: 'LOW',
+        priorityScore: 25.0,
+        priorityLevel: 'LOW',
+        status: 'PENDING',
+        createdAt: DateTime(2025, 1, 1),
+        updatedAt: DateTime(2025, 1, 1),
+      ),
+      Complaint(
+        id: '2',
+        userId: 'u2',
+        category: 'Drainage',
+        description: 'Critical flood issue',
+        latitude: 18.0,
+        longitude: 73.0,
+        severity: 'CRITICAL',
+        priorityScore: 92.5,
+        priorityLevel: 'CRITICAL',
+        status: 'PENDING',
+        createdAt: DateTime(2025, 1, 2),
+        updatedAt: DateTime(2025, 1, 2),
+      ),
+      Complaint(
+        id: '3',
+        userId: 'u3',
+        category: 'Pothole',
+        description: 'Medium hole',
+        latitude: 18.0,
+        longitude: 73.0,
+        severity: 'MEDIUM',
+        priorityScore: 54.0,
+        priorityLevel: 'MEDIUM',
+        status: 'PENDING',
+        createdAt: DateTime(2025, 1, 3),
+        updatedAt: DateTime(2025, 1, 3),
+      ),
+    ];
+
+    list.sort((a, b) {
+      final cmp = b.priorityScore.compareTo(a.priorityScore);
+      if (cmp != 0) return cmp;
+      return b.createdAt.compareTo(a.createdAt);
+    });
+
+    expect(list.first.id, '2');
+    expect(list.first.priorityScore, 92.5);
+    expect(list.last.id, '1');
+    expect(list.last.priorityScore, 25.0);
+  });
+
+  testWidgets('ComplaintDetailsScreen renders delete options when user is owner and executes delete', (WidgetTester tester) async {
+    final complaint = Complaint(
+      id: 'comp-owner-1',
+      userId: 'user-123',
+      category: 'Garbage',
+      description: 'Overflowing dumpster behind market.',
+      latitude: 18.5204,
+      longitude: 73.8567,
+      severity: 'MEDIUM',
+      priorityScore: 50.0,
+      priorityLevel: 'MEDIUM',
+      status: 'PENDING',
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+    );
+
+    final fakeRepo = FakeComplaintRepository();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ComplaintDetailsScreen(
+          initialComplaint: complaint,
+          complaintRepository: fakeRepo,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('DELETE THIS COMPLAINT'), findsOneWidget);
+
+    await tester.tap(find.text('DELETE THIS COMPLAINT'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Delete Complaint?'), findsOneWidget);
+    await tester.tap(find.text('Delete'));
+    await tester.pumpAndSettle();
+
+    expect(fakeRepo.deletedComplaintId, 'comp-owner-1');
+  });
+
+  testWidgets('Citizen profile does NOT contain Admin Console or switch option', (WidgetTester tester) async {
+    final citizen = UserProfile(
+      id: 'citizen-202',
+      email: 'citizen2@pune.gov.in',
+      name: 'Priya Deshmukh',
+      role: 'citizen',
+      createdAt: DateTime.now(),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ProfileScreen(
+          profile: citizen,
+          authRepository: FakeAuthRepository(),
+          complaintRepository: FakeComplaintRepository(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Admin Console'), findsNothing);
+    expect(find.text('Activate Admin Access?'), findsNothing);
+    expect(find.text('My Reported Issues'), findsOneWidget);
+    expect(find.text('Civic Map'), findsOneWidget);
+  });
+
+  testWidgets('EmailLoginScreen allows switching to Administrative Login and displays restricted access badge', (WidgetTester tester) async {
+    final fakeAuth = FakeAuthRepository();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: EmailLoginScreen(authRepository: fakeAuth),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Citizen Login'), findsOneWidget);
+    expect(find.text('Admin Login'), findsOneWidget);
+    expect(find.text('Sign in with Email OTP'), findsOneWidget);
+
+    // Switch to Admin Login
+    await tester.tap(find.text('Admin Login'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Municipal Administrative Login'), findsOneWidget);
+    expect(find.text('SEND ADMIN OTP'), findsOneWidget);
+    expect(find.text('Return to Citizen Login'), findsOneWidget);
+
+    // Switch back to Citizen Login
+    await tester.tap(find.text('Return to Citizen Login'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Sign in with Email OTP'), findsOneWidget);
+    expect(find.text('SEND OTP'), findsOneWidget);
   });
 }

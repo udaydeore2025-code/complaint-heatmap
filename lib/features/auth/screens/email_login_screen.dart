@@ -140,68 +140,108 @@ class _EmailLoginScreenState extends State<EmailLoginScreen> {
         token: token,
       );
 
-      // If user selected Admin portal, verify/activate role
+      // If user selected Admin portal, enforce strict administrative authorization
       final currentUser = _authRepository.currentUser;
       if (currentUser != null && _selectedRoleMode == 'admin') {
         final profile = await _authRepository.fetchUserProfile(currentUser.id);
         if (profile != null && !profile.isAdmin && mounted) {
-          final shouldPromote = await showDialog<bool>(
+          final passkeyController = TextEditingController();
+          final passkeyFormKey = GlobalKey<FormState>();
+
+          final isAuthorized = await showDialog<bool>(
             context: context,
             barrierDismissible: false,
             builder: (ctx) => AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               title: const Row(
                 children: [
-                  Icon(Icons.admin_panel_settings, color: AppTheme.priorityCritical),
+                  Icon(Icons.shield_outlined, color: AppTheme.priorityCritical),
                   SizedBox(width: 8),
-                  Text('Admin Authorization'),
+                  Text('Staff Clearance Required', style: TextStyle(fontSize: 16)),
                 ],
               ),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Account: ${currentUser.email}',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'This account is currently registered as a "Citizen". Would you like to activate Administrator privileges for this municipal portal?',
-                    style: TextStyle(fontSize: 13),
-                  ),
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF1F5F9),
-                      borderRadius: BorderRadius.circular(6),
+              content: Form(
+                key: passkeyFormKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Account: ${currentUser.email}',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                     ),
-                    child: const Text(
-                      'Database policy: is_admin() checks profiles.role == \'admin\'.',
-                      style: TextStyle(fontSize: 11, color: Color(0xFF475569)),
+                    const SizedBox(height: 10),
+                    const Text(
+                      'This account is registered as a Citizen. To access the Municipal Administrative Portal, enter the official Municipal Staff Passkey:',
+                      style: TextStyle(fontSize: 13, color: Color(0xFF475569)),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 14),
+                    TextFormField(
+                      controller: passkeyController,
+                      obscureText: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Municipal Staff Passkey',
+                        hintText: 'Enter passkey',
+                        prefixIcon: Icon(Icons.key_outlined),
+                      ),
+                      validator: (val) {
+                        if (val == null || val.trim().isEmpty) {
+                          return 'Passkey is required';
+                        }
+                        if (val.trim() != AppConstants.municipalAdminPasskey) {
+                          return 'Invalid municipal passkey';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEF2F2),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Text(
+                        'Citizens cannot switch to administrative without official municipal staff clearance.',
+                        style: TextStyle(fontSize: 11, color: Color(0xFF991B1B)),
+                      ),
+                    ),
+                  ],
+                ),
               ),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(ctx, false),
-                  child: const Text('Continue as Citizen'),
+                  child: const Text('Cancel'),
                 ),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF0F172A),
                     foregroundColor: Colors.white,
                   ),
-                  onPressed: () => Navigator.pop(ctx, true),
-                  child: const Text('Activate Admin Role'),
+                  onPressed: () {
+                    if (passkeyFormKey.currentState!.validate()) {
+                      Navigator.pop(ctx, true);
+                    }
+                  },
+                  child: const Text('Verify & Authorize'),
                 ),
               ],
             ),
           );
 
-          if (shouldPromote == true) {
+          if (isAuthorized == true) {
             await _authRepository.updateUserRole(currentUser.id, 'admin');
+          } else {
+            // Strictly deny access and sign out
+            await _authRepository.signOut();
+            if (!mounted) return;
+            setState(() {
+              _isLoading = false;
+              _isOtpSent = false;
+              _errorMessage = 'Access Denied: This account is not authorized as a Municipal Administrator. Citizen accounts cannot access or switch to the administrative portal.';
+            });
+            return;
           }
         }
       }
@@ -323,7 +363,7 @@ class _EmailLoginScreenState extends State<EmailLoginScreen> {
                                   ),
                                   const SizedBox(width: 6),
                                   Text(
-                                    'Citizen Portal',
+                                    'Citizen Login',
                                     style: TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 13,
@@ -365,7 +405,7 @@ class _EmailLoginScreenState extends State<EmailLoginScreen> {
                                   ),
                                   const SizedBox(width: 6),
                                   Text(
-                                    'Admin Portal',
+                                    'Admin Login',
                                     style: TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 13,
@@ -407,7 +447,7 @@ class _EmailLoginScreenState extends State<EmailLoginScreen> {
                 Text(
                   _isOtpSent
                       ? 'Enter Verification Code'
-                      : (isAdminMode ? 'Municipal Admin Login' : 'Sign in with Email OTP'),
+                      : (isAdminMode ? 'Municipal Administrative Login' : 'Sign in with Email OTP'),
                   style: theme.textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.w700,
                     color: const Color(0xFF0F172A),
@@ -421,8 +461,8 @@ class _EmailLoginScreenState extends State<EmailLoginScreen> {
                   _isOtpSent
                       ? 'We sent a verification code to\n${_emailController.text.trim()}'
                       : (isAdminMode
-                          ? 'Enter your municipal administrator email. Access requires database verification.'
-                          : 'No password needed. Enter your email to report and track neighborhood issues.'),
+                          ? 'Restricted municipal authority portal for department engineers and grievance officers.'
+                          : 'Sign in to report, vote, and track neighborhood civic complaints in your city.'),
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: const Color(0xFF64748B),
                     height: 1.4,
@@ -594,6 +634,83 @@ class _EmailLoginScreenState extends State<EmailLoginScreen> {
                               fontWeight: FontWeight.w500,
                             ),
                           ),
+                  ),
+                ],
+                const SizedBox(height: 24),
+                if (!isAdminMode && !_isOtpSent) ...[
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.info_outline, size: 18, color: Color(0xFF64748B)),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Citizen Portal is dedicated to neighborhood reporting and community voting. Citizens cannot access municipal administrative functions.',
+                            style: TextStyle(fontSize: 12, color: Color(0xFF475569)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Center(
+                    child: TextButton.icon(
+                      icon: const Icon(Icons.admin_panel_settings_outlined, size: 16),
+                      label: const Text('Municipal Staff? Switch to Administrative Login'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: const Color(0xFF334155),
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _selectedRoleMode = 'admin';
+                          _errorMessage = null;
+                        });
+                      },
+                    ),
+                  ),
+                ],
+                if (isAdminMode && !_isOtpSent) ...[
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF2F2),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFFECACA)),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.shield_outlined, size: 18, color: Color(0xFFDC2626)),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Administrative Portal is strictly restricted to authorized municipal officers. Unauthorized citizen login attempts will be rejected.',
+                            style: TextStyle(fontSize: 12, color: Color(0xFF991B1B)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Center(
+                    child: TextButton.icon(
+                      icon: const Icon(Icons.arrow_back, size: 16),
+                      label: const Text('Return to Citizen Login'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppTheme.primaryColor,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _selectedRoleMode = 'citizen';
+                          _errorMessage = null;
+                        });
+                      },
+                    ),
                   ),
                 ],
               ],
