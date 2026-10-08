@@ -44,6 +44,51 @@ class _MyComplaintsScreenState extends State<MyComplaintsScreen> {
     }
   }
 
+  Future<void> _confirmAndDelete(Complaint complaint) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Complaint?'),
+        content: const Text(
+          'Are you sure you want to delete this civic complaint? This will permanently remove the report, photo, and all community confirmations. This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.priorityCritical,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      await _complaintRepo.deleteComplaint(complaint.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Complaint deleted successfully.'),
+          backgroundColor: Color(0xFF16A34A),
+        ),
+      );
+      _loadMyComplaints();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to delete complaint: $e')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -103,6 +148,7 @@ class _MyComplaintsScreenState extends State<MyComplaintsScreen> {
                             ),
                           ).then((_) => _loadMyComplaints());
                         },
+                        onDelete: () => _confirmAndDelete(c),
                       );
                     },
                   ),

@@ -9,6 +9,7 @@ class ComplaintCard extends StatelessWidget {
   final VoidCallback? onUpvote;
   final VoidCallback? onDownvote;
   final VoidCallback? onConfirm;
+  final VoidCallback? onDelete;
 
   const ComplaintCard({
     super.key,
@@ -17,6 +18,7 @@ class ComplaintCard extends StatelessWidget {
     this.onUpvote,
     this.onDownvote,
     this.onConfirm,
+    this.onDelete,
   });
 
   Color _getStatusColor(String status) {
@@ -155,6 +157,25 @@ class ComplaintCard extends StatelessWidget {
                       ),
                     ),
                   ),
+                  if (onDelete != null) ...[
+                    const SizedBox(width: 8),
+                    InkWell(
+                      onTap: onDelete,
+                      borderRadius: BorderRadius.circular(6),
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEE2E2),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Icon(
+                          Icons.delete_outline,
+                          size: 16,
+                          color: AppTheme.priorityCritical,
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),

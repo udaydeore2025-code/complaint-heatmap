@@ -177,6 +177,12 @@ ON public.complaints FOR UPDATE
 TO authenticated
 USING (auth.uid() = user_id OR public.is_admin());
 
+DROP POLICY IF EXISTS "Users can delete own complaints or admins can delete any complaint" ON public.complaints;
+CREATE POLICY "Users can delete own complaints or admins can delete any complaint"
+ON public.complaints FOR DELETE
+TO authenticated
+USING (auth.uid() = user_id OR public.is_admin());
+
 -- Votes Policies
 DROP POLICY IF EXISTS "Votes are readable by authenticated users" ON public.votes;
 CREATE POLICY "Votes are readable by authenticated users"

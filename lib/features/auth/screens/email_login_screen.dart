@@ -25,6 +25,9 @@ class _EmailLoginScreenState extends State<EmailLoginScreen> {
   final _otpController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
 
+  // Mode: 'citizen' or 'admin'
+  String _selectedRoleMode = 'citizen';
+
   bool _isOtpSent = false;
   bool _isLoading = false;
   String? _errorMessage;
@@ -136,6 +139,73 @@ class _EmailLoginScreenState extends State<EmailLoginScreen> {
         email: _emailController.text.trim(),
         token: token,
       );
+
+      // If user selected Admin portal, verify/activate role
+      final currentUser = _authRepository.currentUser;
+      if (currentUser != null && _selectedRoleMode == 'admin') {
+        final profile = await _authRepository.fetchUserProfile(currentUser.id);
+        if (profile != null && !profile.isAdmin && mounted) {
+          final shouldPromote = await showDialog<bool>(
+            context: context,
+            barrierDismissible: false,
+            builder: (ctx) => AlertDialog(
+              title: const Row(
+                children: [
+                  Icon(Icons.admin_panel_settings, color: AppTheme.priorityCritical),
+                  SizedBox(width: 8),
+                  Text('Admin Authorization'),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Account: ${currentUser.email}',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'This account is currently registered as a "Citizen". Would you like to activate Administrator privileges for this municipal portal?',
+                    style: TextStyle(fontSize: 13),
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Text(
+                      'Database policy: is_admin() checks profiles.role == \'admin\'.',
+                      style: TextStyle(fontSize: 11, color: Color(0xFF475569)),
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('Continue as Citizen'),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0F172A),
+                    foregroundColor: Colors.white,
+                  ),
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: const Text('Activate Admin Role'),
+                ),
+              ],
+            ),
+          );
+
+          if (shouldPromote == true) {
+            await _authRepository.updateUserRole(currentUser.id, 'admin');
+          }
+        }
+      }
+
       if (!mounted) return;
       setState(() {
         _isLoading = false;
@@ -183,11 +253,14 @@ class _EmailLoginScreenState extends State<EmailLoginScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isAdminMode = _selectedRoleMode == 'admin';
 
     return Scaffold(
       backgroundColor: AppTheme.surfaceColor,
       appBar: AppBar(
-        title: const Text(AppConstants.appName),
+        title: Text(isAdminMode ? 'CivicConnect • Admin Portal' : AppConstants.appName),
+        backgroundColor: isAdminMode ? const Color(0xFF0F172A) : null,
+        foregroundColor: isAdminMode ? Colors.white : null,
         leading: _isOtpSent
             ? IconButton(
                 icon: const Icon(Icons.arrow_back),
@@ -204,32 +277,137 @@ class _EmailLoginScreenState extends State<EmailLoginScreen> {
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
+          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
           child: Form(
             key: _formKey,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const SizedBox(height: 12),
-                // Civic icon header
+                // Portal Switcher: Citizen vs Admin
+                if (!_isOtpSent) ...[
+                  Container(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE2E8F0),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.all(4),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(8),
+                            onTap: () => setState(() => _selectedRoleMode = 'citizen'),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              decoration: BoxDecoration(
+                                color: !isAdminMode ? Colors.white : Colors.transparent,
+                                borderRadius: BorderRadius.circular(8),
+                                boxShadow: !isAdminMode
+                                    ? [
+                                        BoxShadow(
+                                          color: Colors.black.withValues(alpha: 0.05),
+                                          blurRadius: 4,
+                                          offset: const Offset(0, 1),
+                                        ),
+                                      ]
+                                    : null,
+                              ),
+                              alignment: Alignment.center,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.person_outline,
+                                    size: 18,
+                                    color: !isAdminMode ? AppTheme.primaryColor : const Color(0xFF64748B),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Citizen Portal',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13,
+                                      color: !isAdminMode ? AppTheme.primaryColor : const Color(0xFF64748B),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(8),
+                            onTap: () => setState(() => _selectedRoleMode = 'admin'),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              decoration: BoxDecoration(
+                                color: isAdminMode ? const Color(0xFF0F172A) : Colors.transparent,
+                                borderRadius: BorderRadius.circular(8),
+                                boxShadow: isAdminMode
+                                    ? [
+                                        BoxShadow(
+                                          color: Colors.black.withValues(alpha: 0.1),
+                                          blurRadius: 4,
+                                          offset: const Offset(0, 1),
+                                        ),
+                                      ]
+                                    : null,
+                              ),
+                              alignment: Alignment.center,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.admin_panel_settings,
+                                    size: 18,
+                                    color: isAdminMode ? Colors.white : const Color(0xFF64748B),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Admin Portal',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13,
+                                      color: isAdminMode ? Colors.white : const Color(0xFF64748B),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                ],
+
+                // Role Header Icon
                 Center(
                   child: Container(
                     width: 72,
                     height: 72,
                     decoration: BoxDecoration(
-                      color: AppTheme.primaryColor.withValues(alpha: 0.1),
+                      color: isAdminMode
+                          ? const Color(0xFFFEE2E2)
+                          : AppTheme.primaryColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(20),
                     ),
-                    child: const Icon(
-                      Icons.mark_email_read_outlined,
-                      color: AppTheme.primaryColor,
+                    child: Icon(
+                      isAdminMode ? Icons.admin_panel_settings : Icons.mark_email_read_outlined,
+                      color: isAdminMode ? AppTheme.priorityCritical : AppTheme.primaryColor,
                       size: 38,
                     ),
                   ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 18),
+
+                // Title
                 Text(
-                  _isOtpSent ? 'Enter Verification Code' : 'Sign in with Email OTP',
+                  _isOtpSent
+                      ? 'Enter Verification Code'
+                      : (isAdminMode ? 'Municipal Admin Login' : 'Sign in with Email OTP'),
                   style: theme.textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.w700,
                     color: const Color(0xFF0F172A),
@@ -237,17 +415,21 @@ class _EmailLoginScreenState extends State<EmailLoginScreen> {
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
+
+                // Subtitle
                 Text(
                   _isOtpSent
                       ? 'We sent a verification code to\n${_emailController.text.trim()}'
-                      : 'No password needed. Enter your email and we will send you a one-time OTP.',
+                      : (isAdminMode
+                          ? 'Enter your municipal administrator email. Access requires database verification.'
+                          : 'No password needed. Enter your email to report and track neighborhood issues.'),
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: const Color(0xFF64748B),
                     height: 1.4,
                   ),
                   textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 20),
 
                 // Error Banner if any
                 if (_errorMessage != null) ...[
@@ -282,14 +464,14 @@ class _EmailLoginScreenState extends State<EmailLoginScreen> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 16),
                 ],
 
                 if (!_isOtpSent) ...[
                   // Email Input Field
-                  const Text(
-                    'Email Address',
-                    style: TextStyle(
+                  Text(
+                    isAdminMode ? 'Administrator Email' : 'Email Address',
+                    style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
                       color: Color(0xFF334155),
@@ -301,9 +483,9 @@ class _EmailLoginScreenState extends State<EmailLoginScreen> {
                     keyboardType: TextInputType.emailAddress,
                     autocorrect: false,
                     enableSuggestions: false,
-                    decoration: const InputDecoration(
-                      hintText: 'citizen@example.com',
-                      prefixIcon: Icon(Icons.email_outlined),
+                    decoration: InputDecoration(
+                      hintText: isAdminMode ? 'admin@civic.gov' : 'citizen@example.com',
+                      prefixIcon: Icon(isAdminMode ? Icons.security : Icons.email_outlined),
                     ),
                     validator: (val) {
                       if (val == null || val.trim().isEmpty) {
@@ -317,7 +499,15 @@ class _EmailLoginScreenState extends State<EmailLoginScreen> {
                     },
                   ),
                   const SizedBox(height: 24),
+
+                  // Send Button
                   ElevatedButton(
+                    style: isAdminMode
+                        ? ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF0F172A),
+                            foregroundColor: Colors.white,
+                          )
+                        : null,
                     onPressed: _isLoading ? null : _handleSendOtp,
                     child: _isLoading
                         ? const SizedBox(
@@ -328,7 +518,7 @@ class _EmailLoginScreenState extends State<EmailLoginScreen> {
                               color: Colors.white,
                             ),
                           )
-                        : const Text('SEND OTP'),
+                        : Text(isAdminMode ? 'SEND ADMIN OTP' : 'SEND OTP'),
                   ),
                 ] else ...[
                   // OTP Input Field
@@ -362,7 +552,15 @@ class _EmailLoginScreenState extends State<EmailLoginScreen> {
                     ),
                   ),
                   const SizedBox(height: 20),
+
+                  // Verify Button
                   ElevatedButton(
+                    style: isAdminMode
+                        ? ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF0F172A),
+                            foregroundColor: Colors.white,
+                          )
+                        : null,
                     onPressed: _isLoading ? null : _handleVerifyOtp,
                     child: _isLoading
                         ? const SizedBox(
@@ -373,9 +571,10 @@ class _EmailLoginScreenState extends State<EmailLoginScreen> {
                               color: Colors.white,
                             ),
                           )
-                        : const Text('VERIFY OTP'),
+                        : Text(isAdminMode ? 'VERIFY ADMIN OTP' : 'VERIFY OTP'),
                   ),
                   const SizedBox(height: 16),
+
                   // Resend countdown
                   Center(
                     child: _canResend

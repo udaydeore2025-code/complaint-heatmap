@@ -125,6 +125,13 @@ class AuthRepository {
         .eq('id', userId);
   }
 
+  Future<void> updateUserRole(String userId, String role) async {
+    await client
+        .from(SupabaseConstants.profilesTable)
+        .update({'role': role})
+        .eq('id', userId);
+  }
+
   Future<void> signOut() async {
     await client.auth.signOut();
   }

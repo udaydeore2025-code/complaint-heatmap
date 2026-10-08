@@ -128,6 +128,54 @@ class _ComplaintDetailsScreenState extends State<ComplaintDetailsScreen> {
     }
   }
 
+  Future<void> _confirmAndDelete() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Complaint?'),
+        content: const Text(
+          'Are you sure you want to delete this civic complaint? This will permanently remove the report, associated photo, and votes. This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.priorityCritical,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _isActionInProgress = true);
+
+    try {
+      await _complaintRepository.deleteComplaint(_complaint.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Complaint deleted successfully.'),
+          backgroundColor: Color(0xFF16A34A),
+        ),
+      );
+      Navigator.pop(context, true);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isActionInProgress = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to delete complaint: $e')),
+      );
+    }
+  }
+
   Color _getStatusColor(String status) {
     switch (status.toUpperCase()) {
       case 'PENDING':
@@ -174,11 +222,21 @@ class _ComplaintDetailsScreenState extends State<ComplaintDetailsScreen> {
   Widget build(BuildContext context) {
     final statusColor = _getStatusColor(_complaint.status);
     final priorityColor = _getPriorityColor(_complaint.priorityLevel);
+    final currentUserId = _complaintRepository.client.auth.currentUser?.id;
+    final isOwner = currentUserId != null && _complaint.userId == currentUserId;
 
     return Scaffold(
       backgroundColor: AppTheme.surfaceColor,
       appBar: AppBar(
         title: const Text('Complaint Details'),
+        actions: [
+          if (isOwner)
+            IconButton(
+              tooltip: 'Delete Complaint',
+              icon: const Icon(Icons.delete_outline, color: AppTheme.priorityCritical),
+              onPressed: _isActionInProgress ? null : _confirmAndDelete,
+            ),
+        ],
       ),
       body: SingleChildScrollView(
         child: Column(
@@ -582,6 +640,28 @@ class _ComplaintDetailsScreenState extends State<ComplaintDetailsScreen> {
                     ),
                     const SizedBox(height: 16),
                   ],
+                ],
+                if (isOwner) ...[
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppTheme.priorityCritical,
+                        side: const BorderSide(color: AppTheme.priorityCritical),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      icon: const Icon(Icons.delete_outline),
+                      label: const Text(
+                        'DELETE THIS COMPLAINT',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                      onPressed: _isActionInProgress ? null : _confirmAndDelete,
+                    ),
+                  ),
                 ],
               ),
             ),

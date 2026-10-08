@@ -214,10 +214,45 @@ class ComplaintRepository {
     return Complaint.fromJson(newRow);
   }
 
+  /// Deletes a complaint (allowed for creator or admin)
+  Future<void> deleteComplaint(String complaintId) async {
+    final user = client.auth.currentUser;
+    if (user == null) throw Exception('User not authenticated');
+
+    // 1. Fetch image URL if any to delete from storage
+    try {
+      final row = await client
+          .from(SupabaseConstants.complaintsTable)
+          .select('image_url')
+          .eq('id', complaintId)
+          .maybeSingle();
+
+      if (row != null && row['image_url'] != null) {
+        final imageUrl = row['image_url'] as String;
+        final uri = Uri.tryParse(imageUrl);
+        if (uri != null && uri.pathSegments.contains(SupabaseConstants.complaintImagesBucket)) {
+          final bucketIdx = uri.pathSegments.indexOf(SupabaseConstants.complaintImagesBucket);
+          if (bucketIdx != -1 && bucketIdx + 1 < uri.pathSegments.length) {
+            final fileName = uri.pathSegments.sublist(bucketIdx + 1).join('/');
+            await client.storage.from(SupabaseConstants.complaintImagesBucket).remove([fileName]);
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice: Error cleaning up image on delete: $e');
+    }
+
+    // 2. Delete complaint record (cascades to votes, confirmations, and updates)
+    await client
+        .from(SupabaseConstants.complaintsTable)
+        .delete()
+        .eq('id', complaintId);
+  }
+
   Future<List<Complaint>> fetchComplaints({
     String? categoryFilter,
     UserPosition? userLocation,
-    ComplaintSortMode sortMode = ComplaintSortMode.nearMe,
+    ComplaintSortMode sortMode = ComplaintSortMode.highestPriority,
   }) async {
     try {
       final currentUserId = client.auth.currentUser?.id;
@@ -325,7 +360,11 @@ class ComplaintRepository {
           });
           break;
         case ComplaintSortMode.highestPriority:
-          complaints.sort((a, b) => b.priorityScore.compareTo(a.priorityScore));
+          complaints.sort((a, b) {
+            final cmp = b.priorityScore.compareTo(a.priorityScore);
+            if (cmp != 0) return cmp;
+            return b.createdAt.compareTo(a.createdAt);
+          });
           break;
       }
 
@@ -720,7 +759,7 @@ class ComplaintRepository {
         confMap[id] = (confMap[id] ?? 0) + 1;
       }
 
-      return complaintRows.map((r) {
+      final list = complaintRows.map((r) {
         final id = r['id'] as String;
         final complaint = Complaint.fromJson(r as Map<String, dynamic>);
         return complaint.copyWith(
@@ -729,6 +768,14 @@ class ComplaintRepository {
           confirmationCount: confMap[id] ?? 0,
         );
       }).toList();
+
+      list.sort((a, b) {
+        final cmp = b.priorityScore.compareTo(a.priorityScore);
+        if (cmp != 0) return cmp;
+        return b.createdAt.compareTo(a.createdAt);
+      });
+
+      return list;
     } catch (e) {
       debugPrint('Error fetching my complaints: $e');
       return [];

@@ -43,7 +43,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
   RealtimeChannel? _realtimeChannel;
 
   String _selectedCategory = 'All';
-  ComplaintSortMode _sortMode = ComplaintSortMode.nearMe;
+  ComplaintSortMode _sortMode = ComplaintSortMode.highestPriority;
 
   @override
   void initState() {
@@ -119,6 +119,51 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
         return 'Most Upvoted';
       case ComplaintSortMode.highestPriority:
         return 'Highest Priority';
+    }
+  }
+
+  Future<void> _confirmAndDelete(Complaint complaint) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Complaint?'),
+        content: const Text(
+          'Are you sure you want to delete this civic complaint? This will permanently remove the report, photo, and all community confirmations. This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.priorityCritical,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      await _complaintRepository.deleteComplaint(complaint.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Complaint deleted successfully.'),
+          backgroundColor: Color(0xFF16A34A),
+        ),
+      );
+      _loadComplaints();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to delete complaint: $e')),
+      );
     }
   }
 
@@ -451,6 +496,9 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                                       debugPrint('Error confirming: $e');
                                     }
                                   },
+                                  onDelete: (complaint.userId == widget.profile.id || widget.profile.role == 'ADMIN')
+                                      ? () => _confirmAndDelete(complaint)
+                                      : null,
                                 );
                               },
                             ),

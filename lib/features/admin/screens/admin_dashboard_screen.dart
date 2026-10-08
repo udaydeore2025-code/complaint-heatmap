@@ -6,6 +6,7 @@ import '../../../core/repositories/auth_repository.dart';
 import '../../../core/theme/app_theme.dart';
 import 'admin_complaint_details_screen.dart';
 import 'admin_map_screen.dart';
+import '../../home/screens/home_feed_screen.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   final UserProfile profile;
@@ -197,6 +198,21 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   builder: (ctx) => AdminMapScreen(adminRepository: _adminRepo),
                 ),
               ).then((_) => _loadDashboardData());
+            },
+          ),
+          IconButton(
+            tooltip: 'Citizen Feed View',
+            icon: const Icon(Icons.people_alt_outlined),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (ctx) => HomeFeedScreen(
+                    profile: widget.profile,
+                    authRepository: _authRepo,
+                  ),
+                ),
+              );
             },
           ),
           IconButton(
