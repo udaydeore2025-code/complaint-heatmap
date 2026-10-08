@@ -9,6 +9,10 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  geolocator: ^14.1.1
+  google_maps_flutter: ^2.18.2
+  image_picker: ^1.2.4
+  supabase_flutter: ^2.18.0
 
 dev_dependencies:
   flutter_test:
