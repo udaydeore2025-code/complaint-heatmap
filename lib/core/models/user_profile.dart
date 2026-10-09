@@ -13,7 +13,7 @@ class UserProfile {
     required this.createdAt,
   });
 
-  bool get isAdmin => role == 'admin';
+  bool get isAdmin => role.toLowerCase() == 'admin';
 
   String get initials {
     if (name != null && name!.trim().isNotEmpty) {

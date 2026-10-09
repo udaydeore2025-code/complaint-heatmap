@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../../core/models/complaint.dart';
 import '../../../core/models/complaint_update.dart';
+import '../../../core/models/user_profile.dart';
+import '../../../core/repositories/admin_repository.dart';
 import '../../../core/repositories/complaint_repository.dart';
 import '../../../core/services/location_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -10,12 +12,16 @@ class ComplaintDetailsScreen extends StatefulWidget {
   final Complaint initialComplaint;
   final UserPosition? userLocation;
   final ComplaintRepository? complaintRepository;
+  final UserProfile? userProfile;
+  final AdminRepository? adminRepository;
 
   const ComplaintDetailsScreen({
     super.key,
     required this.initialComplaint,
     this.userLocation,
     this.complaintRepository,
+    this.userProfile,
+    this.adminRepository,
   });
 
   @override
@@ -24,6 +30,7 @@ class ComplaintDetailsScreen extends StatefulWidget {
 
 class _ComplaintDetailsScreenState extends State<ComplaintDetailsScreen> {
   late final ComplaintRepository _complaintRepository;
+  late final AdminRepository _adminRepository;
   late Complaint _complaint;
 
   List<ComplaintUpdate> _statusHistory = [];
@@ -36,6 +43,7 @@ class _ComplaintDetailsScreenState extends State<ComplaintDetailsScreen> {
     super.initState();
     _complaint = widget.initialComplaint;
     _complaintRepository = widget.complaintRepository ?? ComplaintRepository();
+    _adminRepository = widget.adminRepository ?? AdminRepository();
     _loadDetails();
     _realtimeChannel = _complaintRepository.subscribeToComplaint(
       complaintId: _complaint.id,
@@ -124,6 +132,71 @@ class _ComplaintDetailsScreenState extends State<ComplaintDetailsScreen> {
       setState(() => _isActionInProgress = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to update confirmation: $e')),
+      );
+    }
+  }
+
+  Future<void> _promptAdminStatusUpdate(String targetStatus) async {
+    final commentController = TextEditingController();
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Change Status to $targetStatus?'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Update complaint status from ${_complaint.status} to $targetStatus.'),
+            const SizedBox(height: 12),
+            TextField(
+              controller: commentController,
+              decoration: const InputDecoration(
+                labelText: 'Official Audit Remark (Optional)',
+                hintText: 'e.g. Dispatched maintenance crew',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Confirm Update'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _isActionInProgress = true);
+
+    try {
+      await _adminRepository.updateComplaintStatus(
+        complaintId: _complaint.id,
+        oldStatus: _complaint.status,
+        newStatus: targetStatus,
+        comment: commentController.text.trim().isEmpty ? null : commentController.text.trim(),
+      );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Status updated to $targetStatus'),
+          backgroundColor: const Color(0xFF16A34A),
+        ),
+      );
+
+      await _loadDetails();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isActionInProgress = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to update status: $e')),
       );
     }
   }
@@ -361,6 +434,125 @@ class _ComplaintDetailsScreenState extends State<ComplaintDetailsScreen> {
                     ],
                   ),
                   const SizedBox(height: 20),
+
+                  // Municipal Administrative Actions Panel (If Admin)
+                  if (widget.userProfile?.isAdmin == true) ...[
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 20),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0F172A),
+                        borderRadius: BorderRadius.circular(14),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.15),
+                            blurRadius: 8,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.admin_panel_settings, color: Color(0xFF38BDF8), size: 22),
+                              const SizedBox(width: 8),
+                              const Text(
+                                'MUNICIPAL ADMINISTRATIVE ACTIONS',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 13,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                              const Spacer(),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: statusColor.withValues(alpha: 0.2),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: statusColor, width: 0.8),
+                                ),
+                                child: Text(
+                                  _complaint.status,
+                                  style: TextStyle(
+                                    color: statusColor,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Handle this complaint by updating its status with recorded audit trail:',
+                            style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                          ),
+                          const SizedBox(height: 14),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: _complaint.status == 'VERIFIED'
+                                        ? const Color(0xFF334155)
+                                        : const Color(0xFF0284C7),
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(vertical: 10),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                  ),
+                                  icon: const Icon(Icons.verified, size: 16),
+                                  label: const Text('Verify', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                                  onPressed: (_isActionInProgress || _complaint.status == 'VERIFIED')
+                                      ? null
+                                      : () => _promptAdminStatusUpdate('VERIFIED'),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: _complaint.status == 'WORK IN PROGRESS'
+                                        ? const Color(0xFF334155)
+                                        : const Color(0xFF8B5CF6),
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(vertical: 10),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                  ),
+                                  icon: const Icon(Icons.engineering_outlined, size: 16),
+                                  label: const Text('In Progress', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                                  onPressed: (_isActionInProgress || _complaint.status == 'WORK IN PROGRESS')
+                                      ? null
+                                      : () => _promptAdminStatusUpdate('WORK IN PROGRESS'),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: _complaint.status == 'SOLVED'
+                                        ? const Color(0xFF334155)
+                                        : const Color(0xFF10B981),
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(vertical: 10),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                  ),
+                                  icon: const Icon(Icons.check_circle_outline, size: 16),
+                                  label: const Text('Solve', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                                  onPressed: (_isActionInProgress || _complaint.status == 'SOLVED')
+                                      ? null
+                                      : () => _promptAdminStatusUpdate('SOLVED'),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
 
                   // Reddit-Style Voting & Community Confirmation Bar
                   Container(

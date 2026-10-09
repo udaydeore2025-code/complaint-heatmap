@@ -23,11 +23,13 @@ class _EmailLoginScreenState extends State<EmailLoginScreen> {
   late final AuthRepository _authRepository;
   final _emailController = TextEditingController();
   final _otpController = TextEditingController();
+  final _passkeyController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
 
   // Mode: 'citizen' or 'admin'
   String _selectedRoleMode = 'citizen';
 
+  bool _isPasskeyVisible = false;
   bool _isOtpSent = false;
   bool _isLoading = false;
   String? _errorMessage;
@@ -47,6 +49,7 @@ class _EmailLoginScreenState extends State<EmailLoginScreen> {
   void dispose() {
     _emailController.dispose();
     _otpController.dispose();
+    _passkeyController.dispose();
     _resendTimer?.cancel();
     super.dispose();
   }
@@ -143,105 +146,109 @@ class _EmailLoginScreenState extends State<EmailLoginScreen> {
       // If user selected Admin portal, enforce strict administrative authorization
       final currentUser = _authRepository.currentUser;
       if (currentUser != null && _selectedRoleMode == 'admin') {
-        final profile = await _authRepository.fetchUserProfile(currentUser.id);
-        if (profile != null && !profile.isAdmin && mounted) {
-          final passkeyController = TextEditingController();
-          final passkeyFormKey = GlobalKey<FormState>();
+        if (_passkeyController.text.trim() == AppConstants.municipalAdminPasskey) {
+          await _authRepository.updateUserRole(currentUser.id, 'admin');
+        } else {
+          final profile = await _authRepository.fetchUserProfile(currentUser.id);
+          if (profile != null && !profile.isAdmin && mounted) {
+            final passkeyController = TextEditingController();
+            final passkeyFormKey = GlobalKey<FormState>();
 
-          final isAuthorized = await showDialog<bool>(
-            context: context,
-            barrierDismissible: false,
-            builder: (ctx) => AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              title: const Row(
-                children: [
-                  Icon(Icons.shield_outlined, color: AppTheme.priorityCritical),
-                  SizedBox(width: 8),
-                  Text('Staff Clearance Required', style: TextStyle(fontSize: 16)),
-                ],
-              ),
-              content: Form(
-                key: passkeyFormKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
+            final isAuthorized = await showDialog<bool>(
+              context: context,
+              barrierDismissible: false,
+              builder: (ctx) => AlertDialog(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                title: const Row(
                   children: [
-                    Text(
-                      'Account: ${currentUser.email}',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                    ),
-                    const SizedBox(height: 10),
-                    const Text(
-                      'This account is registered as a Citizen. To access the Municipal Administrative Portal, enter the official Municipal Staff Passkey:',
-                      style: TextStyle(fontSize: 13, color: Color(0xFF475569)),
-                    ),
-                    const SizedBox(height: 14),
-                    TextFormField(
-                      controller: passkeyController,
-                      obscureText: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Municipal Staff Passkey',
-                        hintText: 'Enter passkey',
-                        prefixIcon: Icon(Icons.key_outlined),
-                      ),
-                      validator: (val) {
-                        if (val == null || val.trim().isEmpty) {
-                          return 'Passkey is required';
-                        }
-                        if (val.trim() != AppConstants.municipalAdminPasskey) {
-                          return 'Invalid municipal passkey';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 10),
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFEF2F2),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: const Text(
-                        'Citizens cannot switch to administrative without official municipal staff clearance.',
-                        style: TextStyle(fontSize: 11, color: Color(0xFF991B1B)),
-                      ),
-                    ),
+                    Icon(Icons.shield_outlined, color: AppTheme.priorityCritical),
+                    SizedBox(width: 8),
+                    Text('Staff Clearance Required', style: TextStyle(fontSize: 16)),
                   ],
                 ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx, false),
-                  child: const Text('Cancel'),
-                ),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF0F172A),
-                    foregroundColor: Colors.white,
+                content: Form(
+                  key: passkeyFormKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Account: ${currentUser.email}',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                      const SizedBox(height: 10),
+                      const Text(
+                        'This account is registered as a Citizen. To access the Municipal Administrative Portal, enter the official Municipal Staff Passkey:',
+                        style: TextStyle(fontSize: 13, color: Color(0xFF475569)),
+                      ),
+                      const SizedBox(height: 14),
+                      TextFormField(
+                        controller: passkeyController,
+                        obscureText: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Municipal Staff Passkey',
+                          hintText: 'Enter passkey (CIVIC-ADMIN-2026)',
+                          prefixIcon: Icon(Icons.key_outlined),
+                        ),
+                        validator: (val) {
+                          if (val == null || val.trim().isEmpty) {
+                            return 'Passkey is required';
+                          }
+                          if (val.trim() != AppConstants.municipalAdminPasskey) {
+                            return 'Invalid municipal passkey';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEF2F2),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Text(
+                          'Citizens cannot switch to administrative without official municipal staff clearance.',
+                          style: TextStyle(fontSize: 11, color: Color(0xFF991B1B)),
+                        ),
+                      ),
+                    ],
                   ),
-                  onPressed: () {
-                    if (passkeyFormKey.currentState!.validate()) {
-                      Navigator.pop(ctx, true);
-                    }
-                  },
-                  child: const Text('Verify & Authorize'),
                 ),
-              ],
-            ),
-          );
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: const Text('Cancel'),
+                  ),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0F172A),
+                      foregroundColor: Colors.white,
+                    ),
+                    onPressed: () {
+                      if (passkeyFormKey.currentState!.validate()) {
+                        Navigator.pop(ctx, true);
+                      }
+                    },
+                    child: const Text('Verify & Authorize'),
+                  ),
+                ],
+              ),
+            );
 
-          if (isAuthorized == true) {
-            await _authRepository.updateUserRole(currentUser.id, 'admin');
-          } else {
-            // Strictly deny access and sign out
-            await _authRepository.signOut();
-            if (!mounted) return;
-            setState(() {
-              _isLoading = false;
-              _isOtpSent = false;
-              _errorMessage = 'Access Denied: This account is not authorized as a Municipal Administrator. Citizen accounts cannot access or switch to the administrative portal.';
-            });
-            return;
+            if (isAuthorized == true) {
+              await _authRepository.updateUserRole(currentUser.id, 'admin');
+            } else {
+              // Strictly deny access and sign out
+              await _authRepository.signOut();
+              if (!mounted) return;
+              setState(() {
+                _isLoading = false;
+                _isOtpSent = false;
+                _errorMessage = 'Access Denied: This account is not authorized as a Municipal Administrator. Citizen accounts cannot access or switch to the administrative portal.';
+              });
+              return;
+            }
           }
         }
       }
@@ -538,6 +545,61 @@ class _EmailLoginScreenState extends State<EmailLoginScreen> {
                       return null;
                     },
                   ),
+                  if (isAdminMode) ...[
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Municipal Staff Passkey',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF334155),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: _passkeyController,
+                      obscureText: !_isPasskeyVisible,
+                      decoration: InputDecoration(
+                        hintText: 'Enter passkey (CIVIC-ADMIN-2026)',
+                        prefixIcon: const Icon(Icons.key_outlined),
+                        suffixIcon: IconButton(
+                          icon: Icon(_isPasskeyVisible ? Icons.visibility_off : Icons.visibility),
+                          onPressed: () => setState(() => _isPasskeyVisible = !_isPasskeyVisible),
+                        ),
+                      ),
+                      validator: (val) {
+                        if (!isAdminMode) return null;
+                        if (val == null || val.trim().isEmpty) {
+                          return 'Please enter Municipal Staff Passkey';
+                        }
+                        if (val.trim() != AppConstants.municipalAdminPasskey) {
+                          return 'Invalid passkey. Municipal clearance required.';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEF2F2),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFFECACA)),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.shield_outlined, size: 16, color: Color(0xFFDC2626)),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Staff Passkey: CIVIC-ADMIN-2026',
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF991B1B)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 24),
 
                   // Send Button

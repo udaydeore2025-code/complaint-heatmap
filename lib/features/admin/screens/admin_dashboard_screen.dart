@@ -607,6 +607,83 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                               const Icon(Icons.chevron_right, color: Color(0xFF94A3B8)),
                                             ],
                                           ),
+                                          const SizedBox(height: 12),
+                                          const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                                          const SizedBox(height: 8),
+
+                                          // Quick Admin Handling Buttons
+                                          Row(
+                                            children: [
+                                              Expanded(
+                                                child: OutlinedButton.icon(
+                                                  style: OutlinedButton.styleFrom(
+                                                    foregroundColor: const Color(0xFF0284C7),
+                                                    padding: const EdgeInsets.symmetric(vertical: 6),
+                                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                                  ),
+                                                  icon: const Icon(Icons.verified, size: 14),
+                                                  label: const Text('Verify', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                                  onPressed: complaint.status == 'VERIFIED'
+                                                      ? null
+                                                      : () async {
+                                                          await _adminRepo.updateComplaintStatus(
+                                                            complaintId: complaint.id,
+                                                            oldStatus: complaint.status,
+                                                            newStatus: 'VERIFIED',
+                                                            comment: 'Verified by municipal officer',
+                                                          );
+                                                          _loadDashboardData();
+                                                        },
+                                                ),
+                                              ),
+                                              const SizedBox(width: 6),
+                                              Expanded(
+                                                child: OutlinedButton.icon(
+                                                  style: OutlinedButton.styleFrom(
+                                                    foregroundColor: const Color(0xFF8B5CF6),
+                                                    padding: const EdgeInsets.symmetric(vertical: 6),
+                                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                                  ),
+                                                  icon: const Icon(Icons.engineering_outlined, size: 14),
+                                                  label: const Text('In Progress', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                                  onPressed: complaint.status == 'WORK IN PROGRESS'
+                                                      ? null
+                                                      : () async {
+                                                          await _adminRepo.updateComplaintStatus(
+                                                            complaintId: complaint.id,
+                                                            oldStatus: complaint.status,
+                                                            newStatus: 'WORK IN PROGRESS',
+                                                            comment: 'Assigned to field maintenance crew',
+                                                          );
+                                                          _loadDashboardData();
+                                                        },
+                                                ),
+                                              ),
+                                              const SizedBox(width: 6),
+                                              Expanded(
+                                                child: OutlinedButton.icon(
+                                                  style: OutlinedButton.styleFrom(
+                                                    foregroundColor: const Color(0xFF10B981),
+                                                    padding: const EdgeInsets.symmetric(vertical: 6),
+                                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                                  ),
+                                                  icon: const Icon(Icons.check_circle_outline, size: 14),
+                                                  label: const Text('Solve', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                                  onPressed: complaint.status == 'SOLVED'
+                                                      ? null
+                                                      : () async {
+                                                          await _adminRepo.updateComplaintStatus(
+                                                            complaintId: complaint.id,
+                                                            oldStatus: complaint.status,
+                                                            newStatus: 'SOLVED',
+                                                            comment: 'Resolved by municipal authority',
+                                                          );
+                                                          _loadDashboardData();
+                                                        },
+                                                ),
+                                              ),
+                                            ],
+                                          ),
                                         ],
                                       ),
                                     ),

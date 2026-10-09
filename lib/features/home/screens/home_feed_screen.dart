@@ -9,6 +9,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../widgets/complaint_card.dart';
 import '../../complaints/screens/report_complaint_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../admin/screens/admin_dashboard_screen.dart';
 import '../../complaints/screens/complaint_details_screen.dart';
 import '../../complaints/screens/my_complaints_screen.dart';
 import '../../map/screens/complaint_map_screen.dart';
@@ -204,6 +205,22 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
           ],
         ),
         actions: [
+          if (widget.profile.isAdmin)
+            IconButton(
+              tooltip: 'Admin Console',
+              icon: const Icon(Icons.admin_panel_settings, color: AppTheme.priorityCritical),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (ctx) => AdminDashboardScreen(
+                      profile: widget.profile,
+                      authRepository: _authRepository,
+                    ),
+                  ),
+                ).then((_) => _loadComplaints());
+              },
+            ),
           IconButton(
             tooltip: 'Civic Map',
             icon: const Icon(Icons.map_outlined),
@@ -254,6 +271,38 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
             icon: const Icon(Icons.refresh),
             onPressed: _initLocationAndFeed,
           ),
+          IconButton(
+            tooltip: 'Sign Out / Switch Portal',
+            icon: const Icon(Icons.logout, color: AppTheme.priorityCritical),
+            onPressed: () async {
+              final confirm = await showDialog<bool>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: const Text('Sign Out / Switch Portal?'),
+                  content: const Text(
+                    'Are you sure you want to sign out? You can switch to the Administrative Portal or log in with another account.',
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      child: const Text('Cancel'),
+                    ),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.priorityCritical,
+                        foregroundColor: Colors.white,
+                      ),
+                      onPressed: () => Navigator.pop(ctx, true),
+                      child: const Text('Sign Out'),
+                    ),
+                  ],
+                ),
+              );
+              if (confirm == true) {
+                await _authRepository.signOut();
+              }
+            },
+          ),
         ],
       ),
       body: RefreshIndicator(
@@ -261,6 +310,42 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
         onRefresh: _loadComplaints,
         child: Column(
           children: [
+            if (widget.profile.isAdmin)
+              Container(
+                width: double.infinity,
+                color: const Color(0xFF0F172A),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Row(
+                  children: [
+                    const Icon(Icons.admin_panel_settings, color: Color(0xFF38BDF8), size: 18),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text(
+                        'Logged in as Municipal Admin',
+                        style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                    TextButton(
+                      style: TextButton.styleFrom(
+                        foregroundColor: const Color(0xFF38BDF8),
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                      ),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (ctx) => AdminDashboardScreen(
+                              profile: widget.profile,
+                              authRepository: _authRepository,
+                            ),
+                          ),
+                        ).then((_) => _loadComplaints());
+                      },
+                      child: const Text('OPEN CONSOLE', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                    ),
+                  ],
+                ),
+              ),
             // Sorting & Filter bar
             Container(
               color: Colors.white,
@@ -459,6 +544,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                                           initialComplaint: complaint,
                                           userLocation: _currentLocation,
                                           complaintRepository: _complaintRepository,
+                                          userProfile: widget.profile,
                                         ),
                                       ),
                                     );

@@ -650,4 +650,120 @@ void main() {
     expect(find.text('Sign in with Email OTP'), findsOneWidget);
     expect(find.text('SEND OTP'), findsOneWidget);
   });
+
+  testWidgets('EmailLoginScreen displays Municipal Staff Passkey field in Admin mode', (WidgetTester tester) async {
+    final fakeAuth = FakeAuthRepository();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: EmailLoginScreen(authRepository: fakeAuth),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // In citizen mode, passkey field does not exist
+    expect(find.text('Municipal Staff Passkey'), findsNothing);
+
+    // Switch to Admin
+    await tester.tap(find.text('Admin Login'));
+    await tester.pumpAndSettle();
+
+    // In admin mode, passkey field is clearly present
+    expect(find.text('Municipal Staff Passkey'), findsOneWidget);
+    expect(find.text('Staff Passkey: CIVIC-ADMIN-2026'), findsOneWidget);
+  });
+
+  testWidgets('AdminDashboardScreen renders quick action buttons Verify, In Progress, Solve directly on complaint card', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(800, 1800);
+    addTearDown(tester.view.resetPhysicalSize);
+
+    final adminUser = UserProfile(
+      id: 'admin-1',
+      email: 'admin@civic.gov',
+      name: 'Commissioner Sharma',
+      role: 'ADMIN',
+      createdAt: DateTime.now(),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AdminDashboardScreen(
+          profile: adminUser,
+          adminRepository: FakeAdminRepository(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Priority Queue'), findsOneWidget);
+    expect(find.text('Verify'), findsOneWidget);
+    expect(find.text('In Progress'), findsOneWidget);
+    expect(find.text('Solve'), findsOneWidget);
+  });
+
+  testWidgets('ComplaintDetailsScreen renders MUNICIPAL ADMINISTRATIVE ACTIONS only when user is admin', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(800, 1800);
+    addTearDown(tester.view.resetPhysicalSize);
+
+    final sampleComplaint = Complaint(
+      id: 'comp-detail-test',
+      userId: 'user-xyz',
+      category: 'Garbage',
+      description: 'Overflowing dumpster behind market.',
+      latitude: 18.5204,
+      longitude: 73.8567,
+      severity: 'HIGH',
+      priorityScore: 75.0,
+      priorityLevel: 'HIGH',
+      status: 'PENDING',
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+    );
+
+    final citizenUser = UserProfile(
+      id: 'user-xyz',
+      email: 'citizen@example.com',
+      role: 'citizen',
+      createdAt: DateTime.now(),
+    );
+
+    final adminUser = UserProfile(
+      id: 'admin-1',
+      email: 'admin@civic.gov',
+      role: 'ADMIN',
+      createdAt: DateTime.now(),
+    );
+
+    // 1. Citizen viewing complaint details
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ComplaintDetailsScreen(
+          initialComplaint: sampleComplaint,
+          complaintRepository: FakeComplaintRepository(),
+          userProfile: citizenUser,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('MUNICIPAL ADMINISTRATIVE ACTIONS'), findsNothing);
+
+    // 2. Admin viewing complaint details
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ComplaintDetailsScreen(
+          initialComplaint: sampleComplaint,
+          complaintRepository: FakeComplaintRepository(),
+          userProfile: adminUser,
+          adminRepository: FakeAdminRepository(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('MUNICIPAL ADMINISTRATIVE ACTIONS'), findsOneWidget);
+    expect(find.widgetWithText(ElevatedButton, 'Verify'), findsOneWidget);
+    expect(find.widgetWithText(ElevatedButton, 'In Progress'), findsOneWidget);
+    expect(find.widgetWithText(ElevatedButton, 'Solve'), findsOneWidget);
+  });
 }
