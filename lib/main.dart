@@ -12,6 +12,51 @@ void main() async {
   } catch (e) {
     debugPrint('Supabase initialization note: $e');
   }
+
+  // Prevent silent blank white screen crashes in release mode
+  ErrorWidget.builder = (FlutterErrorDetails details) {
+    return Material(
+      color: Colors.white,
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.error_outline, color: Colors.red, size: 24),
+                    SizedBox(width: 8),
+                    Text(
+                      'Rendering Error',
+                      style: TextStyle(
+                        color: Colors.red,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  details.exceptionAsString(),
+                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Colors.black87),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  details.stack?.toString() ?? '',
+                  style: const TextStyle(fontSize: 10, color: Colors.black54),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  };
+
   runApp(const CivicConnectApp());
 }
 

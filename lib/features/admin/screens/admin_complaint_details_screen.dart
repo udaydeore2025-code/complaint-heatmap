@@ -37,12 +37,21 @@ class _AdminComplaintDetailsScreenState extends State<AdminComplaintDetailsScree
   }
 
   Future<void> _loadHistory() async {
-    final list = await _adminRepository.fetchStatusHistory(_complaint.id);
-    if (!mounted) return;
-    setState(() {
-      _history = list;
-      _isLoadingHistory = false;
-    });
+    try {
+      final list = await _adminRepository.fetchStatusHistory(_complaint.id);
+      if (!mounted) return;
+      setState(() {
+        _history = list;
+        _isLoadingHistory = false;
+      });
+    } catch (e) {
+      debugPrint('Status history fetch notice: $e');
+      if (!mounted) return;
+      setState(() {
+        _history = [];
+        _isLoadingHistory = false;
+      });
+    }
   }
 
   Future<void> _promptStatusUpdate(String targetStatus) async {
@@ -194,75 +203,106 @@ class _AdminComplaintDetailsScreenState extends State<AdminComplaintDetailsScree
   }
 
   Widget _buildComplaintPhoto() {
-    final url = _complaint.imageUrl;
-    if (url == null || url.trim().isEmpty) {
-      return Container(
-        height: 120,
-        color: const Color(0xFFF1F5F9),
-        child: const Center(
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.image_not_supported_outlined, color: Color(0xFF94A3B8), size: 22),
-              SizedBox(width: 8),
-              Text(
-                'No photo attached with this complaint',
-                style: TextStyle(color: Color(0xFF64748B), fontSize: 13, fontWeight: FontWeight.w500),
+    try {
+      final url = _complaint.imageUrl;
+      if (url != null && url.trim().isNotEmpty) {
+        final trimmed = url.trim();
+        final uri = Uri.tryParse(trimmed);
+        if (uri != null && (uri.scheme == 'http' || uri.scheme == 'https')) {
+          return Container(
+            height: 220,
+            width: double.infinity,
+            color: Colors.black,
+            child: Image.network(
+              trimmed,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) => const Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.broken_image, size: 44, color: Colors.white54),
+                    SizedBox(height: 6),
+                    Text('Unable to load photo', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                  ],
+                ),
               ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    final isHttp = url.startsWith('http://') || url.startsWith('https://');
-    if (!isHttp) {
-      return Container(
-        height: 120,
-        color: const Color(0xFFF1F5F9),
-        child: const Center(
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.photo_outlined, color: Color(0xFF94A3B8), size: 22),
-              SizedBox(width: 8),
-              Text(
-                'Photo attached (offline file)',
-                style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
-              ),
-            ],
-          ),
-        ),
-      );
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice: Error building complaint photo: $e');
     }
 
     return Container(
-      height: 220,
+      height: 120,
       width: double.infinity,
-      color: Colors.black,
-      child: Image.network(
-        url,
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) => const Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.broken_image, size: 44, color: Colors.white54),
-              SizedBox(height: 6),
-              Text('Unable to load photo', style: TextStyle(color: Colors.white54, fontSize: 12)),
-            ],
-          ),
+      color: const Color(0xFFF1F5F9),
+      child: const Center(
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.photo_outlined, color: Color(0xFF94A3B8), size: 22),
+            SizedBox(width: 8),
+            Text(
+              'No photo attached with this complaint',
+              style: TextStyle(color: Color(0xFF64748B), fontSize: 13, fontWeight: FontWeight.w500),
+            ),
+          ],
         ),
-        loadingBuilder: (context, child, progress) {
-          if (progress == null) return child;
-          return const Center(child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2));
-        },
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    try {
+      return _buildScaffold(context);
+    } catch (e, stack) {
+      debugPrint('AdminComplaintDetailsScreen build error: $e\n$stack');
+      return Scaffold(
+        backgroundColor: AppTheme.surfaceColor,
+        appBar: AppBar(
+          title: const Text('Admin Review', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          backgroundColor: const Color(0xFF0F172A),
+          foregroundColor: Colors.white,
+        ),
+        body: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.error_outline, color: Colors.red, size: 28),
+                    SizedBox(width: 8),
+                    Text(
+                      'Error Loading Complaint Details',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.red),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text('Complaint: ${_complaint.formattedComplaintId} (${_complaint.category})'),
+                const SizedBox(height: 8),
+                Text('Description: ${_complaint.description}', style: const TextStyle(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 12),
+                Text('Error details: $e', style: const TextStyle(fontSize: 12, color: Colors.black54)),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Return to Dashboard'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+  }
+
+  Widget _buildScaffold(BuildContext context) {
     final statusColor = _getStatusColor(_complaint.status);
     final priorityColor = _getPriorityColor(_complaint.priorityLevel);
 
@@ -429,7 +469,7 @@ class _AdminComplaintDetailsScreenState extends State<AdminComplaintDetailsScree
                         const SizedBox(height: 10),
                         const Divider(height: 1, color: Color(0xFFF1F5F9)),
                         const SizedBox(height: 12),
-                        SelectableText(
+                        Text(
                           _complaint.description.trim().isNotEmpty
                               ? _complaint.description.trim()
                               : 'No description provided.',
