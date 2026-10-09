@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/models/complaint.dart';
 import '../../../core/repositories/complaint_repository.dart';
 import '../../../core/services/location_service.dart';
+import '../../../core/services/map_launcher_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../complaints/screens/complaint_details_screen.dart';
 
@@ -23,10 +25,9 @@ class ComplaintMapScreen extends StatefulWidget {
 
 class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
   late final ComplaintRepository _complaintRepo;
-  GoogleMapController? _mapController;
+  final MapController _mapController = MapController();
 
   List<Complaint> _allComplaints = [];
-  Set<Marker> _markers = {};
   Complaint? _selectedComplaint;
   bool _isLoading = true;
   String _selectedCategory = 'ALL';
@@ -44,9 +45,7 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
 
   Future<void> _initializeData() async {
     setState(() => _isLoading = true);
-
     _userPosition ??= await LocationService.getCurrentLocation();
-
     await _loadComplaints();
   }
 
@@ -60,7 +59,6 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
       if (!mounted) return;
       setState(() {
         _allComplaints = list;
-        _buildMarkers();
         _isLoading = false;
       });
     } catch (e) {
@@ -72,47 +70,39 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
     }
   }
 
-  double _getMarkerHue(Complaint c) {
-    if (c.status == 'SOLVED') return BitmapDescriptor.hueGreen;
+  Color _getMarkerColor(Complaint c) {
+    if (c.status == 'SOLVED') return const Color(0xFF16A34A);
     switch (c.priorityLevel.toUpperCase()) {
       case 'CRITICAL':
-        return BitmapDescriptor.hueRed;
+        return const Color(0xFFDC2626);
       case 'HIGH':
-        return BitmapDescriptor.hueOrange;
+        return const Color(0xFFEA580C);
       case 'MEDIUM':
-        return BitmapDescriptor.hueYellow;
+        return const Color(0xFFD97706);
       case 'LOW':
       default:
-        return BitmapDescriptor.hueAzure;
+        return const Color(0xFF2563EB);
     }
   }
 
-  void _buildMarkers() {
-    final markers = <Marker>{};
-
-    for (final c in _allComplaints) {
-      final markerHue = _getMarkerHue(c);
-
-      markers.add(
-        Marker(
-          markerId: MarkerId(c.id),
-          position: LatLng(c.latitude, c.longitude),
-          icon: BitmapDescriptor.defaultMarkerWithHue(markerHue),
-          infoWindow: InfoWindow(
-            title: c.category.toUpperCase(),
-            snippet: '${c.priorityLevel} Priority • ${c.status}',
-            onTap: () => _openComplaintDetails(c),
-          ),
-          onTap: () {
-            setState(() {
-              _selectedComplaint = c;
-            });
-          },
-        ),
-      );
+  IconData _getCategoryIcon(String category) {
+    switch (category.toLowerCase()) {
+      case 'pothole':
+        return Icons.warning_amber_rounded;
+      case 'garbage':
+        return Icons.delete_outline;
+      case 'water supply':
+      case 'water':
+        return Icons.water_drop_outlined;
+      case 'streetlight':
+        return Icons.lightbulb_outline;
+      case 'drainage':
+        return Icons.waves;
+      case 'traffic':
+        return Icons.traffic;
+      default:
+        return Icons.report_problem_outlined;
     }
-
-    _markers = markers;
   }
 
   void _openComplaintDetails(Complaint complaint) {
@@ -129,12 +119,10 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
   }
 
   void _recenterOnUser() {
-    if (_userPosition != null && _mapController != null) {
-      _mapController!.animateCamera(
-        CameraUpdate.newLatLngZoom(
-          LatLng(_userPosition!.latitude, _userPosition!.longitude),
-          15.5,
-        ),
+    if (_userPosition != null) {
+      _mapController.move(
+        LatLng(_userPosition!.latitude, _userPosition!.longitude),
+        15.5,
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -151,7 +139,13 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Civic Map'),
+        title: const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Civic Map', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Text('OpenStreetMap • Community Issues', style: TextStyle(fontSize: 11, color: Colors.white70)),
+          ],
+        ),
         actions: [
           IconButton(
             tooltip: 'Refresh',
@@ -162,25 +156,75 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
       ),
       body: Stack(
         children: [
-          // Google Map View
-          GoogleMap(
-            initialCameraPosition: CameraPosition(
-              target: initialTarget,
-              zoom: 14.5,
+          // OpenStreetMap View
+          FlutterMap(
+            mapController: _mapController,
+            options: MapOptions(
+              initialCenter: initialTarget,
+              initialZoom: 14.5,
+              onTap: (tapPosition, point) {
+                if (_selectedComplaint != null) {
+                  setState(() => _selectedComplaint = null);
+                }
+              },
             ),
-            markers: _markers,
-            myLocationEnabled: true,
-            myLocationButtonEnabled: false,
-            zoomControlsEnabled: false,
-            mapToolbarEnabled: false,
-            onMapCreated: (controller) {
-              _mapController = controller;
-            },
-            onTap: (_) {
-              if (_selectedComplaint != null) {
-                setState(() => _selectedComplaint = null);
-              }
-            },
+            children: [
+              TileLayer(
+                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                userAgentPackageName: 'com.civicconnect.complaint_heatmap',
+                maxZoom: 19,
+              ),
+              MarkerLayer(
+                markers: _allComplaints.map((c) {
+                  final color = _getMarkerColor(c);
+                  final isSelected = _selectedComplaint?.id == c.id;
+
+                  return Marker(
+                    point: LatLng(c.latitude, c.longitude),
+                    width: isSelected ? 48 : 40,
+                    height: isSelected ? 48 : 40,
+                    child: GestureDetector(
+                      onTap: () {
+                        setState(() => _selectedComplaint = c);
+                        _mapController.move(LatLng(c.latitude, c.longitude), 16.0);
+                      },
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: color,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: isSelected ? 3 : 2),
+                          boxShadow: const [
+                            BoxShadow(color: Colors.black38, blurRadius: 4, offset: Offset(0, 2)),
+                          ],
+                        ),
+                        child: Icon(
+                          _getCategoryIcon(c.category),
+                          color: Colors.white,
+                          size: isSelected ? 22 : 18,
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
+          ),
+
+          // OpenStreetMap Attribution badge
+          Positioned(
+            bottom: 4,
+            right: 8,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.85),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: const Text(
+                '© OpenStreetMap contributors',
+                style: TextStyle(fontSize: 9, color: Color(0xFF475569)),
+              ),
+            ),
           ),
 
           // Loading overlay
@@ -208,7 +252,7 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       ),
                       SizedBox(width: 8),
-                      Text('Loading map markers...', style: TextStyle(fontSize: 12)),
+                      Text('Loading OpenStreetMap issues...', style: TextStyle(fontSize: 12)),
                     ],
                   ),
                 ),
@@ -363,13 +407,31 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
                           style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
                         ),
                         const Spacer(),
+                        OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFF1E40AF),
+                            side: const BorderSide(color: Color(0xFF93C5FD)),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          ),
+                          icon: const Icon(Icons.navigation, size: 13),
+                          label: const Text('GPS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                          onPressed: () {
+                            MapLauncherService.navigateToCoordinates(
+                              latitude: _selectedComplaint!.latitude,
+                              longitude: _selectedComplaint!.longitude,
+                              title: '${_selectedComplaint!.category} Issue',
+                              context: context,
+                            );
+                          },
+                        ),
+                        const SizedBox(width: 8),
                         ElevatedButton(
                           style: ElevatedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                             textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                           ),
                           onPressed: () => _openComplaintDetails(_selectedComplaint!),
-                          child: const Text('View Details'),
+                          child: const Text('Details'),
                         ),
                       ],
                     ),
@@ -382,4 +444,3 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
     );
   }
 }
-

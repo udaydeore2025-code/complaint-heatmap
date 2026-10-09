@@ -3,6 +3,7 @@ import '../../../core/models/complaint.dart';
 import '../../../core/models/user_profile.dart';
 import '../../../core/repositories/admin_repository.dart';
 import '../../../core/repositories/auth_repository.dart';
+import '../../../core/services/map_launcher_service.dart';
 import '../../../core/theme/app_theme.dart';
 import 'admin_complaint_details_screen.dart';
 import 'admin_map_screen.dart';
@@ -814,6 +815,55 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                                           _loadDashboardData();
                                                         },
                                                 ),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Row(
+                                            children: [
+                                              Expanded(
+                                                child: OutlinedButton.icon(
+                                                  style: OutlinedButton.styleFrom(
+                                                    foregroundColor: const Color(0xFF1E40AF),
+                                                    side: const BorderSide(color: Color(0xFF93C5FD)),
+                                                    backgroundColor: const Color(0xFFEFF6FF),
+                                                    padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 8),
+                                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                                  ),
+                                                  icon: const Icon(Icons.navigation, size: 14, color: Color(0xFF1E40AF)),
+                                                  label: const Text(
+                                                    'Navigate via Google Maps',
+                                                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                                                  ),
+                                                  onPressed: () {
+                                                    MapLauncherService.navigateToCoordinates(
+                                                      latitude: complaint.latitude,
+                                                      longitude: complaint.longitude,
+                                                      title: '${complaint.category} Hotspot (${complaint.formattedComplaintId})',
+                                                      context: context,
+                                                    );
+                                                  },
+                                                ),
+                                              ),
+                                              const SizedBox(width: 6),
+                                              IconButton(
+                                                tooltip: 'View on Hotspot Map',
+                                                style: IconButton.styleFrom(
+                                                  backgroundColor: const Color(0xFFF1F5F9),
+                                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                                ),
+                                                icon: const Icon(Icons.map_outlined, size: 16, color: Color(0xFF0F172A)),
+                                                onPressed: () {
+                                                  Navigator.push(
+                                                    context,
+                                                    MaterialPageRoute(
+                                                      builder: (ctx) => AdminMapScreen(
+                                                        adminRepository: _adminRepo,
+                                                        initialComplaint: complaint,
+                                                      ),
+                                                    ),
+                                                  ).then((_) => _loadDashboardData());
+                                                },
                                               ),
                                             ],
                                           ),

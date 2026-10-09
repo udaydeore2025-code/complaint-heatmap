@@ -15,6 +15,8 @@ import 'package:complaint_heatmap/features/complaints/screens/complaint_details_
 import 'package:complaint_heatmap/features/complaints/screens/report_complaint_screen.dart';
 import 'package:complaint_heatmap/features/admin/screens/admin_dashboard_screen.dart';
 import 'package:complaint_heatmap/features/admin/screens/admin_complaint_details_screen.dart';
+import 'package:complaint_heatmap/features/admin/screens/admin_map_screen.dart';
+import 'package:complaint_heatmap/core/models/location_group.dart';
 import 'package:complaint_heatmap/features/complaints/screens/my_complaints_screen.dart';
 import 'package:complaint_heatmap/features/profile/screens/profile_screen.dart';
 import 'package:complaint_heatmap/core/repositories/admin_repository.dart';
@@ -198,6 +200,9 @@ class FakeAdminRepository extends AdminRepository {
 
   @override
   Future<List<ComplaintUpdate>> fetchStatusHistory(String complaintId) async => [];
+
+  @override
+  Future<List<LocationGroup>> fetchLocationGroups() async => [];
 
   String? deletedComplaintId;
 
@@ -1151,5 +1156,102 @@ void main() {
 
     expect(find.text('Sign Out?'), findsOneWidget);
     expect(find.text('Are you sure you want to sign out of CivicConnect?'), findsOneWidget);
+  });
+
+  testWidgets('AdminComplaintDetailsScreen renders Google Maps navigation options in Exact Location card and AppBar', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(800, 1800);
+    addTearDown(tester.view.resetPhysicalSize);
+
+    final testComplaint = Complaint(
+      id: 'comp-nav-1',
+      userId: 'user-uday',
+      userName: 'udaydeore2025',
+      userEmail: 'udaydeore2025@gmail.com',
+      category: 'Pothole',
+      description: 'Dangerous pothole on highway',
+      latitude: 18.489974,
+      longitude: 73.818564,
+      severity: 'HIGH',
+      priorityScore: 78.0,
+      priorityLevel: 'HIGH',
+      status: 'PENDING',
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AdminComplaintDetailsScreen(
+          complaint: testComplaint,
+          adminRepository: FakeAdminRepository(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Verify Navigate in Google Maps button is rendered in the Exact Location card
+    expect(find.text('Navigate in Google Maps'), findsOneWidget);
+
+    // Verify View Hotspot Cluster on Map button is rendered
+    expect(find.text('View Hotspot Cluster on Map'), findsOneWidget);
+
+    // Verify Google Maps navigation icon is in AppBar
+    expect(find.byTooltip('Navigate via Google Maps'), findsOneWidget);
+    expect(find.byTooltip('View on Hotspot Map'), findsOneWidget);
+  });
+
+  testWidgets('AdminDashboardScreen renders Navigate via Google Maps on complaint cards', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(800, 1800);
+    addTearDown(tester.view.resetPhysicalSize);
+
+    final adminUser = UserProfile(
+      id: 'admin-99',
+      email: 'admin@civic.gov',
+      name: 'Municipal Commissioner',
+      role: 'admin',
+      createdAt: DateTime.now(),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AdminDashboardScreen(
+          profile: adminUser,
+          adminRepository: FakeAdminRepository(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Verify Navigate via Google Maps button is on the priority queue cards
+    expect(find.text('Navigate via Google Maps'), findsWidgets);
+    expect(find.byTooltip('View on Hotspot Map'), findsWidgets);
+  });
+
+  testWidgets('AdminMapScreen toggles to Hotspot List view and renders Google Maps navigation', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(800, 1800);
+    addTearDown(tester.view.resetPhysicalSize);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AdminMapScreen(
+          adminRepository: FakeAdminRepository(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Verify app bar actions and title
+    expect(find.text('Admin Hotspot Map'), findsOneWidget);
+    expect(find.byTooltip('Show Hotspot List'), findsOneWidget);
+
+    // Tap to switch to Hotspot List view
+    await tester.tap(find.byTooltip('Show Hotspot List'));
+    await tester.pumpAndSettle();
+
+    // Verify list view elements
+    expect(find.text('Navigate (GPS)'), findsWidgets);
+    expect(find.text('OSM Web'), findsWidgets);
+    expect(find.text('Review'), findsWidgets);
+    expect(find.text('Dangerous crater on expressway lane.'), findsOneWidget);
   });
 }

@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import '../../../core/models/complaint.dart';
 import '../../../core/models/complaint_update.dart';
 import '../../../core/repositories/admin_repository.dart';
+import '../../../core/services/map_launcher_service.dart';
 import '../../../core/theme/app_theme.dart';
+import 'admin_map_screen.dart';
 
 class AdminComplaintDetailsScreen extends StatefulWidget {
   final Complaint complaint;
@@ -203,6 +205,33 @@ class _AdminComplaintDetailsScreenState extends State<AdminComplaintDetailsScree
         backgroundColor: const Color(0xFF0F172A),
         foregroundColor: Colors.white,
         actions: [
+          IconButton(
+            tooltip: 'Navigate via Google Maps',
+            icon: const Icon(Icons.navigation_outlined, color: Colors.lightBlueAccent),
+            onPressed: () {
+              MapLauncherService.navigateToCoordinates(
+                latitude: _complaint.latitude,
+                longitude: _complaint.longitude,
+                title: '${_complaint.category} Hotspot (${_complaint.formattedComplaintId})',
+                context: context,
+              );
+            },
+          ),
+          IconButton(
+            tooltip: 'View on Hotspot Map',
+            icon: const Icon(Icons.map_outlined),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (ctx) => AdminMapScreen(
+                    adminRepository: _adminRepository,
+                    initialComplaint: _complaint,
+                  ),
+                ),
+              );
+            },
+          ),
           IconButton(
             tooltip: 'Delete Complaint',
             icon: const Icon(Icons.delete_outline, color: Color(0xFFF87171)),
@@ -503,6 +532,90 @@ class _AdminComplaintDetailsScreenState extends State<AdminComplaintDetailsScree
                         Text(
                           'Longitude: ${_complaint.longitude.toStringAsFixed(6)}',
                           style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+                        ),
+                        const SizedBox(height: 14),
+                        const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                        const SizedBox(height: 12),
+                        // Prominent Google Maps Navigation Option
+                        // Navigation & OpenStreetMap Options
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF1E40AF),
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  elevation: 2,
+                                ),
+                                icon: const Icon(Icons.navigation, size: 17),
+                                label: const Text(
+                                  'Navigate in Google Maps',
+                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                ),
+                                onPressed: () {
+                                  MapLauncherService.navigateToCoordinates(
+                                    latitude: _complaint.latitude,
+                                    longitude: _complaint.longitude,
+                                    title: '${_complaint.category} Hotspot (${_complaint.formattedComplaintId})',
+                                    context: context,
+                                  );
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            OutlinedButton.icon(
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: const Color(0xFF0F172A),
+                                side: const BorderSide(color: Color(0xFFCBD5E1)),
+                                backgroundColor: const Color(0xFFF8FAFC),
+                                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                              icon: const Icon(Icons.open_in_browser, size: 16),
+                              label: const Text('OSM', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                              onPressed: () {
+                                MapLauncherService.openInOpenStreetMap(
+                                  latitude: _complaint.latitude,
+                                  longitude: _complaint.longitude,
+                                  context: context,
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: const Color(0xFF0F172A),
+                                  side: const BorderSide(color: Color(0xFFCBD5E1)),
+                                  backgroundColor: const Color(0xFFF8FAFC),
+                                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                ),
+                                icon: const Icon(Icons.radar, size: 18, color: Color(0xFFDC2626)),
+                                label: const Text(
+                                  'View Hotspot Cluster on Map',
+                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                ),
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (ctx) => AdminMapScreen(
+                                        adminRepository: _adminRepository,
+                                        initialComplaint: _complaint,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
