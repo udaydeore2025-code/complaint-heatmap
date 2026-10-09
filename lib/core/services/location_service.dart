@@ -9,9 +9,12 @@ class UserPosition {
 }
 
 class LocationService {
+  static UserPosition? mockLocation;
+
   /// Checks and requests location permission, returning current user coordinates.
   /// Does NOT perform continuous tracking — one-shot fetch only.
   static Future<UserPosition?> getCurrentLocation() async {
+    if (mockLocation != null) return mockLocation;
     try {
       final isEnabled = await Geolocator.isLocationServiceEnabled();
       if (!isEnabled) {

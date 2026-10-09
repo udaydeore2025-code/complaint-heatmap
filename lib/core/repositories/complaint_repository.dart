@@ -250,11 +250,56 @@ class ComplaintRepository {
       debugPrint('Notice: Error cleaning up image on delete: $e');
     }
 
-    // 2. Delete complaint record (cascades to votes, confirmations, and updates)
-    await client
-        .from(SupabaseConstants.complaintsTable)
-        .delete()
-        .eq('id', complaintId);
+    // 2. Try calling RPC delete_complaint function (SECURITY DEFINER bypasses child-table RLS deadlocks)
+    bool deletedViaRpc = false;
+    try {
+      final rpcResult = await client.rpc('delete_complaint', params: {
+        'complaint_id': complaintId,
+        'target_complaint_id': complaintId,
+      });
+      if (rpcResult == true) {
+        deletedViaRpc = true;
+      }
+    } catch (e) {
+      debugPrint('Notice: RPC delete_complaint dual-param error: $e. Trying target_complaint_id...');
+      try {
+        final rpcResult2 = await client.rpc('delete_complaint', params: {
+          'target_complaint_id': complaintId,
+        });
+        if (rpcResult2 == true) {
+          deletedViaRpc = true;
+        }
+      } catch (e2) {
+        debugPrint('Notice: RPC delete_complaint single-param error: $e2');
+      }
+    }
+
+    // 3. Fallback: direct table deletion with child cleanup
+    if (!deletedViaRpc) {
+      // Clean up child tables to prevent foreign key or RLS blocking
+      try {
+        await client.from(SupabaseConstants.votesTable).delete().eq('complaint_id', complaintId);
+      } catch (_) {}
+      try {
+        await client.from(SupabaseConstants.confirmationsTable).delete().eq('complaint_id', complaintId);
+      } catch (_) {}
+      try {
+        await client.from(SupabaseConstants.updatesTable).delete().eq('complaint_id', complaintId);
+      } catch (_) {}
+
+      final deletedRows = await client
+          .from(SupabaseConstants.complaintsTable)
+          .delete()
+          .eq('id', complaintId)
+          .select('id');
+
+      if (deletedRows.isEmpty) {
+        throw Exception(
+          'Database rejected delete request. '
+          'Please execute the SQL script in "supabase_fix_delete.sql" in your Supabase Dashboard SQL Editor.',
+        );
+      }
+    }
   }
 
   Future<List<Complaint>> fetchComplaints({
@@ -320,6 +365,34 @@ class ComplaintRepository {
         }
       }
 
+      // Batch fetch complainant profiles
+      final userIds = complaintRows
+          .map((r) => r['user_id'] as String?)
+          .where((id) => id != null && id.isNotEmpty)
+          .cast<String>()
+          .toSet()
+          .toList();
+
+      final Map<String, String> userNameMap = {};
+      final Map<String, String> userEmailMap = {};
+      if (userIds.isNotEmpty) {
+        try {
+          final List<dynamic> profileRows = await client
+              .from(SupabaseConstants.profilesTable)
+              .select('id, name, email')
+              .filter('id', 'in', userIds);
+          for (final p in profileRows) {
+            final uId = p['id'] as String;
+            final n = p['name'] as String?;
+            final e = p['email'] as String?;
+            if (n != null && n.trim().isNotEmpty) userNameMap[uId] = n.trim();
+            if (e != null && e.trim().isNotEmpty) userEmailMap[uId] = e.trim();
+          }
+        } catch (e) {
+          debugPrint('Notice: Error fetching profiles in fetchComplaints: $e');
+        }
+      }
+
       // 4. Construct Complaint objects & calculate distances
       List<Complaint> complaints = complaintRows.map((row) {
         final id = row['id'] as String;
@@ -337,7 +410,10 @@ class ComplaintRepository {
         }
 
         final complaint = Complaint.fromJson(row);
+        final uId = complaint.userId;
         return complaint.copyWith(
+          userName: userNameMap[uId] ?? (userEmailMap[uId]?.split('@').first),
+          userEmail: userEmailMap[uId],
           upvoteCount: upvotesMap[id] ?? 0,
           downvoteCount: downvotesMap[id] ?? 0,
           confirmationCount: confirmationsMap[id] ?? 0,
@@ -440,8 +516,28 @@ class ComplaintRepository {
         );
       }
 
+      // Fetch complainant profile if available
+      String? uName;
+      String? uEmail;
+      final uId = row['user_id'] as String?;
+      if (uId != null) {
+        try {
+          final pRow = await client
+              .from(SupabaseConstants.profilesTable)
+              .select('name, email')
+              .eq('id', uId)
+              .maybeSingle();
+          if (pRow != null) {
+            uName = pRow['name'] as String?;
+            uEmail = pRow['email'] as String?;
+          }
+        } catch (_) {}
+      }
+
       final complaint = Complaint.fromJson(row);
       return complaint.copyWith(
+        userName: uName ?? (uEmail?.split('@').first),
+        userEmail: uEmail,
         upvoteCount: upvotes,
         downvoteCount: downvotes,
         confirmationCount: confirmations,

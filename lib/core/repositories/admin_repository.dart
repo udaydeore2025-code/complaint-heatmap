@@ -128,10 +128,41 @@ class AdminRepository {
         confMap[id] = (confMap[id] ?? 0) + 1;
       }
 
+      // Fetch complainant profiles in batch
+      final userIds = rows
+          .map((r) => r['user_id'] as String?)
+          .where((id) => id != null && id.isNotEmpty)
+          .cast<String>()
+          .toSet()
+          .toList();
+
+      final Map<String, String> userNameMap = {};
+      final Map<String, String> userEmailMap = {};
+      if (userIds.isNotEmpty) {
+        try {
+          final List<dynamic> profileRows = await client
+              .from(SupabaseConstants.profilesTable)
+              .select('id, name, email')
+              .filter('id', 'in', userIds);
+          for (final p in profileRows) {
+            final uId = p['id'] as String;
+            final n = p['name'] as String?;
+            final e = p['email'] as String?;
+            if (n != null && n.trim().isNotEmpty) userNameMap[uId] = n.trim();
+            if (e != null && e.trim().isNotEmpty) userEmailMap[uId] = e.trim();
+          }
+        } catch (e) {
+          debugPrint('Notice: Error fetching profiles in priority queue: $e');
+        }
+      }
+
       return rows.map((r) {
         final id = r['id'] as String;
         final complaint = Complaint.fromJson(r as Map<String, dynamic>);
+        final uId = complaint.userId;
         return complaint.copyWith(
+          userName: userNameMap[uId] ?? (userEmailMap[uId]?.split('@').first),
+          userEmail: userEmailMap[uId],
           upvoteCount: upvotesMap[id] ?? 0,
           downvoteCount: downvotesMap[id] ?? 0,
           confirmationCount: confMap[id] ?? 0,
@@ -197,6 +228,85 @@ class AdminRepository {
     } catch (e) {
       debugPrint('Error fetching location groups: $e');
       return [];
+    }
+  }
+
+  /// Permanently deletes a complaint and all associated records (admin authority)
+  Future<void> deleteComplaint(String complaintId) async {
+    final user = client.auth.currentUser;
+    if (user == null) throw Exception('Admin not authenticated');
+
+    // 1. Delete image from storage bucket if attached
+    try {
+      final row = await client
+          .from(SupabaseConstants.complaintsTable)
+          .select('image_url')
+          .eq('id', complaintId)
+          .maybeSingle();
+
+      if (row != null && row['image_url'] != null) {
+        final imageUrl = row['image_url'] as String;
+        final uri = Uri.tryParse(imageUrl);
+        if (uri != null && uri.pathSegments.contains(SupabaseConstants.complaintImagesBucket)) {
+          final bucketIdx = uri.pathSegments.indexOf(SupabaseConstants.complaintImagesBucket);
+          if (bucketIdx != -1 && bucketIdx + 1 < uri.pathSegments.length) {
+            final fileName = uri.pathSegments.sublist(bucketIdx + 1).join('/');
+            await client.storage.from(SupabaseConstants.complaintImagesBucket).remove([fileName]);
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice: Error cleaning up image on admin delete: $e');
+    }
+
+    // 2. Try calling RPC delete_complaint function
+    bool deletedViaRpc = false;
+    try {
+      final rpcResult = await client.rpc('delete_complaint', params: {
+        'complaint_id': complaintId,
+        'target_complaint_id': complaintId,
+      });
+      if (rpcResult == true) {
+        deletedViaRpc = true;
+      }
+    } catch (e) {
+      debugPrint('Notice: RPC delete_complaint dual-param error in AdminRepository: $e. Trying single param...');
+      try {
+        final rpcResult2 = await client.rpc('delete_complaint', params: {
+          'target_complaint_id': complaintId,
+        });
+        if (rpcResult2 == true) {
+          deletedViaRpc = true;
+        }
+      } catch (e2) {
+        debugPrint('Notice: Single param RPC error in AdminRepository: $e2');
+      }
+    }
+
+    // 3. Fallback: clean child tables and delete complaint
+    if (!deletedViaRpc) {
+      try {
+        await client.from(SupabaseConstants.votesTable).delete().eq('complaint_id', complaintId);
+      } catch (_) {}
+      try {
+        await client.from(SupabaseConstants.confirmationsTable).delete().eq('complaint_id', complaintId);
+      } catch (_) {}
+      try {
+        await client.from(SupabaseConstants.updatesTable).delete().eq('complaint_id', complaintId);
+      } catch (_) {}
+
+      final deletedRows = await client
+          .from(SupabaseConstants.complaintsTable)
+          .delete()
+          .eq('id', complaintId)
+          .select('id');
+
+      if (deletedRows.isEmpty) {
+        throw Exception(
+          'Database rejected delete request. '
+          'Please ensure the Supabase DELETE policy or delete_complaint SQL function is executed in your Supabase SQL editor.',
+        );
+      }
     }
   }
 }

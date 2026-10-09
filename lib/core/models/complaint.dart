@@ -17,6 +17,8 @@ class Complaint {
   final DateTime updatedAt;
 
   // Relational & calculated attributes
+  final String? userName;
+  final String? userEmail;
   final int upvoteCount;
   final int downvoteCount;
   final int confirmationCount;
@@ -27,6 +29,8 @@ class Complaint {
   const Complaint({
     required this.id,
     required this.userId,
+    this.userName,
+    this.userEmail,
     required this.category,
     required this.description,
     this.imageUrl,
@@ -53,6 +57,10 @@ class Complaint {
     return Complaint(
       id: json['id'] as String,
       userId: json['user_id'] as String,
+      userName: json['user_name'] as String? ??
+          (json['profiles'] != null ? json['profiles']['name'] as String? : null),
+      userEmail: json['user_email'] as String? ??
+          (json['profiles'] != null ? json['profiles']['email'] as String? : null),
       category: json['category'] as String,
       description: json['description'] as String,
       imageUrl: json['image_url'] as String?,
@@ -84,6 +92,8 @@ class Complaint {
     return {
       'id': id,
       'user_id': userId,
+      'user_name': userName,
+      'user_email': userEmail,
       'category': category,
       'description': description,
       'image_url': imageUrl,
@@ -101,9 +111,40 @@ class Complaint {
     };
   }
 
+  String get complainantDisplayName {
+    if (userName != null && userName!.trim().isNotEmpty) {
+      return userName!.trim();
+    }
+    if (userEmail != null && userEmail!.trim().isNotEmpty) {
+      return userEmail!.trim().split('@').first;
+    }
+    return 'Citizen';
+  }
+
+  String get formattedComplaintId {
+    if (id.length >= 8) {
+      return '#CMP-${id.substring(0, 8).toUpperCase()}';
+    }
+    return '#CMP-${id.toUpperCase()}';
+  }
+
+  String get formattedDateTime {
+    final local = createdAt.toLocal();
+    final months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    final hour = local.hour > 12 ? local.hour - 12 : (local.hour == 0 ? 12 : local.hour);
+    final ampm = local.hour >= 12 ? 'PM' : 'AM';
+    final minute = local.minute.toString().padLeft(2, '0');
+    return '${months[local.month - 1]} ${local.day}, ${local.year} at $hour:$minute $ampm';
+  }
+
   Complaint copyWith({
     String? id,
     String? userId,
+    String? userName,
+    String? userEmail,
     String? category,
     String? description,
     String? imageUrl,
@@ -128,6 +169,8 @@ class Complaint {
     return Complaint(
       id: id ?? this.id,
       userId: userId ?? this.userId,
+      userName: userName ?? this.userName,
+      userEmail: userEmail ?? this.userEmail,
       category: category ?? this.category,
       description: description ?? this.description,
       imageUrl: imageUrl ?? this.imageUrl,

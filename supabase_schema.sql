@@ -121,16 +121,53 @@ CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
--- 10. Helper function: is_admin() based securely on profiles.role
+-- 10. Helper function: is_admin() based securely on profiles.role (case-insensitive)
 CREATE OR REPLACE FUNCTION public.is_admin()
 RETURNS boolean AS $$
 BEGIN
   RETURN EXISTS (
     SELECT 1 FROM public.profiles
-    WHERE id = auth.uid() AND role = 'admin'
+    WHERE id = auth.uid() AND LOWER(role) = 'admin'
   );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 11. Secure Stored Procedure for Cascading Deletion
+CREATE OR REPLACE FUNCTION public.delete_complaint(target_complaint_id UUID)
+RETURNS boolean AS $$
+DECLARE
+    v_user_id UUID;
+    v_role TEXT;
+BEGIN
+    SELECT user_id INTO v_user_id
+    FROM public.complaints
+    WHERE id = target_complaint_id;
+
+    -- If already deleted or not found, return true
+    IF v_user_id IS NULL THEN
+        RETURN true;
+    END IF;
+
+    SELECT role INTO v_role
+    FROM public.profiles
+    WHERE id = auth.uid();
+
+    -- Check permission: complaint owner or municipal admin
+    IF auth.uid() != v_user_id AND LOWER(COALESCE(v_role, '')) != 'admin' THEN
+        RAISE EXCEPTION 'Not authorized to delete this complaint';
+    END IF;
+
+    -- Delete all child records cleanly
+    DELETE FROM public.votes WHERE complaint_id = target_complaint_id;
+    DELETE FROM public.complaint_confirmations WHERE complaint_id = target_complaint_id;
+    DELETE FROM public.complaint_updates WHERE complaint_id = target_complaint_id;
+    DELETE FROM public.complaints WHERE id = target_complaint_id;
+
+    RETURN true;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+GRANT EXECUTE ON FUNCTION public.delete_complaint(UUID) TO authenticated;
 
 -- ==============================================================================
 -- PHASE 5: ROW LEVEL SECURITY (RLS)
@@ -157,6 +194,12 @@ CREATE POLICY "Users can update own profile"
 ON public.profiles FOR UPDATE
 TO authenticated
 USING (auth.uid() = id);
+
+DROP POLICY IF EXISTS "Users can insert own profile" ON public.profiles;
+CREATE POLICY "Users can insert own profile"
+ON public.profiles FOR INSERT
+TO authenticated
+WITH CHECK (auth.uid() = id);
 
 -- Complaints Policies
 DROP POLICY IF EXISTS "Complaints are readable by authenticated users" ON public.complaints;
@@ -203,10 +246,14 @@ TO authenticated
 USING (auth.uid() = user_id);
 
 DROP POLICY IF EXISTS "Users can delete their own vote" ON public.votes;
-CREATE POLICY "Users can delete their own vote"
+CREATE POLICY "Users can delete their own vote or complaint owner can delete"
 ON public.votes FOR DELETE
 TO authenticated
-USING (auth.uid() = user_id);
+USING (
+  auth.uid() = user_id 
+  OR auth.uid() IN (SELECT user_id FROM public.complaints WHERE id = complaint_id)
+  OR public.is_admin()
+);
 
 -- Confirmations Policies
 DROP POLICY IF EXISTS "Confirmations are readable by authenticated users" ON public.complaint_confirmations;
@@ -222,10 +269,14 @@ TO authenticated
 WITH CHECK (auth.uid() = user_id);
 
 DROP POLICY IF EXISTS "Users can remove their confirmation" ON public.complaint_confirmations;
-CREATE POLICY "Users can remove their confirmation"
+CREATE POLICY "Users can remove confirmation or complaint owner can delete"
 ON public.complaint_confirmations FOR DELETE
 TO authenticated
-USING (auth.uid() = user_id);
+USING (
+  auth.uid() = user_id 
+  OR auth.uid() IN (SELECT user_id FROM public.complaints WHERE id = complaint_id)
+  OR public.is_admin()
+);
 
 -- Complaint Updates Policies (Status Timeline)
 DROP POLICY IF EXISTS "Updates timeline is readable by authenticated users" ON public.complaint_updates;
@@ -239,6 +290,15 @@ CREATE POLICY "Only admins can record status updates"
 ON public.complaint_updates FOR INSERT
 TO authenticated
 WITH CHECK (public.is_admin());
+
+DROP POLICY IF EXISTS "Complaint updates can be deleted by admins or complaint owner" ON public.complaint_updates;
+CREATE POLICY "Complaint updates can be deleted by admins or complaint owner"
+ON public.complaint_updates FOR DELETE
+TO authenticated
+USING (
+  auth.uid() IN (SELECT user_id FROM public.complaints WHERE id = complaint_id)
+  OR public.is_admin()
+);
 
 -- Location Groups Policies
 DROP POLICY IF EXISTS "Location groups are readable by authenticated users" ON public.location_groups;

@@ -180,6 +180,42 @@ class ComplaintCard extends StatelessWidget {
               ),
             ),
 
+            // Complainant, Complaint ID, and Date & Time
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+              child: Row(
+                children: [
+                  Text(
+                    complaint.formattedComplaintId,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontFamily: 'monospace',
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF64748B),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text('•', style: TextStyle(color: Color(0xFFCBD5E1), fontSize: 10)),
+                  const SizedBox(width: 8),
+                  const Icon(Icons.person_outline, size: 13, color: Color(0xFF64748B)),
+                  const SizedBox(width: 3),
+                  Expanded(
+                    child: Text(
+                      complaint.complainantDisplayName,
+                      style: const TextStyle(fontSize: 11, color: Color(0xFF475569), fontWeight: FontWeight.w600),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const Icon(Icons.access_time, size: 12, color: Color(0xFF94A3B8)),
+                  const SizedBox(width: 4),
+                  Text(
+                    complaint.formattedDateTime,
+                    style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                  ),
+                ],
+              ),
+            ),
+
             // Complaint photo (if present)
             if (complaint.imageUrl != null && complaint.imageUrl!.isNotEmpty)
               Container(

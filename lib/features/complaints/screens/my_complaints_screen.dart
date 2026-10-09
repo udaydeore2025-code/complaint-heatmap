@@ -71,6 +71,11 @@ class _MyComplaintsScreenState extends State<MyComplaintsScreen> {
 
     if (confirmed != true) return;
 
+    final previous = List<Complaint>.from(_myComplaints);
+    setState(() {
+      _myComplaints.removeWhere((c) => c.id == complaint.id);
+    });
+
     try {
       await _complaintRepo.deleteComplaint(complaint.id);
       if (!mounted) return;
@@ -83,6 +88,9 @@ class _MyComplaintsScreenState extends State<MyComplaintsScreen> {
       _loadMyComplaints();
     } catch (e) {
       if (!mounted) return;
+      setState(() {
+        _myComplaints = previous;
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to delete complaint: $e')),
       );
@@ -137,8 +145,8 @@ class _MyComplaintsScreenState extends State<MyComplaintsScreen> {
                       final c = _myComplaints[index];
                       return ComplaintCard(
                         complaint: c,
-                        onTap: () {
-                          Navigator.push(
+                        onTap: () async {
+                          final deleted = await Navigator.push<bool>(
                             context,
                             MaterialPageRoute(
                               builder: (ctx) => ComplaintDetailsScreen(
@@ -146,7 +154,15 @@ class _MyComplaintsScreenState extends State<MyComplaintsScreen> {
                                 complaintRepository: _complaintRepo,
                               ),
                             ),
-                          ).then((_) => _loadMyComplaints());
+                          );
+                          if (deleted == true) {
+                            if (mounted) {
+                              setState(() {
+                                _myComplaints.removeWhere((item) => item.id == c.id);
+                              });
+                            }
+                          }
+                          _loadMyComplaints();
                         },
                         onDelete: () => _confirmAndDelete(c),
                       );

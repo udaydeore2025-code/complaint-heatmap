@@ -15,6 +15,17 @@ class AuthRepository {
 
   User? get currentUser => client.auth.currentUser;
 
+  String? _activePortalRole;
+  String? get activePortalRole => _activePortalRole;
+
+  void setActivePortalRole(String? role) {
+    _activePortalRole = role;
+  }
+
+  void clearActivePortalRole() {
+    _activePortalRole = null;
+  }
+
   Future<void> sendOtp({required String email}) async {
     final cleanEmail = email.trim().toLowerCase();
     await client.auth.signInWithOtp(
@@ -26,48 +37,53 @@ class AuthRepository {
   Future<AuthResponse> verifyOtp({
     required String email,
     required String token,
+    String? portalRole,
   }) async {
+    if (portalRole != null) {
+      _activePortalRole = portalRole;
+    }
     final cleanEmail = email.trim().toLowerCase();
     final cleanToken = token.trim();
 
+    AuthResponse? response;
     // 1. Try OtpType.email (login OTP)
     try {
-      final response = await client.auth.verifyOTP(
+      response = await client.auth.verifyOTP(
         email: cleanEmail,
         token: cleanToken,
         type: OtpType.email,
       );
-      if (response.user != null) {
-        await _ensureProfileExists(response.user!);
-      }
-      return response;
     } on AuthException catch (e) {
       debugPrint('verifyOtp OtpType.email attempt: ${e.message}');
     }
 
     // 2. Try OtpType.signup (new registration confirmation OTP)
-    try {
-      final response = await client.auth.verifyOTP(
-        email: cleanEmail,
-        token: cleanToken,
-        type: OtpType.signup,
-      );
-      if (response.user != null) {
-        await _ensureProfileExists(response.user!);
+    if (response == null || response.user == null) {
+      try {
+        response = await client.auth.verifyOTP(
+          email: cleanEmail,
+          token: cleanToken,
+          type: OtpType.signup,
+        );
+      } on AuthException catch (e) {
+        debugPrint('verifyOtp OtpType.signup attempt: ${e.message}');
       }
-      return response;
-    } on AuthException catch (e) {
-      debugPrint('verifyOtp OtpType.signup attempt: ${e.message}');
     }
 
     // 3. Fallback to OtpType.magiclink
-    final response = await client.auth.verifyOTP(
-      email: cleanEmail,
-      token: cleanToken,
-      type: OtpType.magiclink,
-    );
+    if (response == null || response.user == null) {
+      response = await client.auth.verifyOTP(
+        email: cleanEmail,
+        token: cleanToken,
+        type: OtpType.magiclink,
+      );
+    }
+
     if (response.user != null) {
       await _ensureProfileExists(response.user!);
+      if (portalRole != null) {
+        await updateUserRole(response.user!.id, portalRole);
+      }
     }
     return response;
   }
@@ -101,19 +117,51 @@ class AuthRepository {
           .eq('id', userId)
           .maybeSingle();
 
-      if (data == null) {
-        // Fallback: create if missing
-        final user = client.auth.currentUser;
-        if (user != null && user.id == userId) {
-          await _ensureProfileExists(user);
-          return await fetchUserProfile(userId);
-        }
-        return null;
+      if (data != null) {
+        return UserProfile.fromJson(data);
       }
 
-      return UserProfile.fromJson(data);
+      // If missing from profiles table, try creating once
+      final user = client.auth.currentUser;
+      if (user != null && user.id == userId) {
+        await _ensureProfileExists(user);
+        final retryData = await client
+            .from(SupabaseConstants.profilesTable)
+            .select()
+            .eq('id', userId)
+            .maybeSingle();
+        if (retryData != null) {
+          return UserProfile.fromJson(retryData);
+        }
+
+        // Graceful fallback from active session metadata
+        final role = (user.userMetadata?['role'] as String?) ?? 'citizen';
+        final name = (user.userMetadata?['name'] as String?) ??
+            (user.email != null ? user.email!.split('@').first : 'Citizen');
+        return UserProfile(
+          id: user.id,
+          email: user.email ?? '',
+          name: name,
+          role: role,
+          createdAt: DateTime.now(),
+        );
+      }
+      return null;
     } catch (e) {
       debugPrint('Error fetching user profile: $e');
+      final user = client.auth.currentUser;
+      if (user != null && user.id == userId) {
+        final role = (user.userMetadata?['role'] as String?) ?? 'citizen';
+        final name = (user.userMetadata?['name'] as String?) ??
+            (user.email != null ? user.email!.split('@').first : 'Citizen');
+        return UserProfile(
+          id: user.id,
+          email: user.email ?? '',
+          name: name,
+          role: role,
+          createdAt: DateTime.now(),
+        );
+      }
       return null;
     }
   }
@@ -126,13 +174,25 @@ class AuthRepository {
   }
 
   Future<void> updateUserRole(String userId, String role) async {
-    await client
-        .from(SupabaseConstants.profilesTable)
-        .update({'role': role})
-        .eq('id', userId);
+    _activePortalRole = role;
+    try {
+      await client
+          .from(SupabaseConstants.profilesTable)
+          .update({'role': role})
+          .eq('id', userId);
+    } catch (e) {
+      debugPrint('Error updating profiles.role: $e');
+    }
+
+    try {
+      await client.auth.updateUser(UserAttributes(data: {'role': role, 'active_portal': role}));
+    } catch (e) {
+      debugPrint('Error updating auth metadata role: $e');
+    }
   }
 
   Future<void> signOut() async {
+    _activePortalRole = null;
     await client.auth.signOut();
   }
 }

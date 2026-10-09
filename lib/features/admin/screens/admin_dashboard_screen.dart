@@ -77,6 +77,59 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     _loadDashboardData();
   }
 
+  Future<void> _confirmAndDelete(Complaint complaint) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Complaint as Admin?'),
+        content: Text(
+          'Are you sure you want to delete complaint ${complaint.formattedComplaintId}? This will permanently remove the complaint, associated photo, community confirmations, and status audit trail. This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.priorityCritical,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete Permanently'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    final previousQueue = List<Complaint>.from(_priorityQueue);
+    setState(() {
+      _priorityQueue.removeWhere((c) => c.id == complaint.id);
+    });
+
+    try {
+      await _adminRepo.deleteComplaint(complaint.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Complaint ${complaint.formattedComplaintId} deleted successfully.'),
+          backgroundColor: const Color(0xFF16A34A),
+        ),
+      );
+      _loadDashboardData();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _priorityQueue = previousQueue;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to delete complaint: $e')),
+      );
+    }
+  }
+
   Color _getPriorityColor(String level) {
     switch (level.toUpperCase()) {
       case 'LOW':
@@ -450,7 +503,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                   child: InkWell(
                                     borderRadius: BorderRadius.circular(12),
                                     onTap: () async {
-                                      await Navigator.push(
+                                      final deleted = await Navigator.push<bool>(
                                         context,
                                         MaterialPageRoute(
                                           builder: (ctx) => AdminComplaintDetailsScreen(
@@ -459,6 +512,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                           ),
                                         ),
                                       );
+                                      if (deleted == true) {
+                                        if (mounted) {
+                                          setState(() {
+                                            _priorityQueue.removeWhere((c) => c.id == complaint.id);
+                                          });
+                                        }
+                                      }
                                       // Refresh upon return to reflect status updates
                                       _loadDashboardData();
                                     },
@@ -527,9 +587,82 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                                   ),
                                                 ),
                                               ),
+                                              const SizedBox(width: 8),
+                                              InkWell(
+                                                onTap: () => _confirmAndDelete(complaint),
+                                                borderRadius: BorderRadius.circular(8),
+                                                child: Container(
+                                                  padding: const EdgeInsets.all(5),
+                                                  decoration: BoxDecoration(
+                                                    color: const Color(0xFFFEE2E2),
+                                                    borderRadius: BorderRadius.circular(8),
+                                                    border: Border.all(color: const Color(0xFFFECACA), width: 0.8),
+                                                  ),
+                                                  child: const Icon(
+                                                    Icons.delete_outline,
+                                                    size: 16,
+                                                    color: AppTheme.priorityCritical,
+                                                  ),
+                                                ),
+                                              ),
                                             ],
                                           ),
-                                          const SizedBox(height: 10),
+                                          const SizedBox(height: 8),
+
+                                          // Row 2: Complaint ID & Complainant Name
+                                          Row(
+                                            children: [
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFFF1F5F9),
+                                                  borderRadius: BorderRadius.circular(6),
+                                                  border: Border.all(color: const Color(0xFFCBD5E1), width: 0.8),
+                                                ),
+                                                child: Text(
+                                                  complaint.formattedComplaintId,
+                                                  style: const TextStyle(
+                                                    fontSize: 11,
+                                                    fontFamily: 'monospace',
+                                                    fontWeight: FontWeight.w700,
+                                                    color: Color(0xFF1E293B),
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              const Icon(Icons.person_pin, size: 14, color: AppTheme.primaryColor),
+                                              const SizedBox(width: 4),
+                                              Expanded(
+                                                child: Text(
+                                                  'Complainant: ${complaint.complainantDisplayName}',
+                                                  style: const TextStyle(
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.w700,
+                                                    color: Color(0xFF1E293B),
+                                                  ),
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 4),
+
+                                          // Row 3: Date & Time of Complaint
+                                          Row(
+                                            children: [
+                                              const Icon(Icons.access_time, size: 13, color: Color(0xFF64748B)),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                complaint.formattedDateTime,
+                                                style: const TextStyle(
+                                                  fontSize: 11,
+                                                  color: Color(0xFF64748B),
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 8),
 
                                           // Description
                                           Text(

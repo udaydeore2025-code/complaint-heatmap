@@ -113,6 +113,54 @@ class _AdminComplaintDetailsScreenState extends State<AdminComplaintDetailsScree
     }
   }
 
+  Future<void> _confirmAndDelete() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Complaint as Admin?'),
+        content: Text(
+          'Are you sure you want to permanently delete complaint ${_complaint.formattedComplaintId}? All photos, citizen confirmations, and status audit history will be deleted. This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.priorityCritical,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete Permanently'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _isUpdating = true);
+
+    try {
+      await _adminRepository.deleteComplaint(_complaint.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Complaint ${_complaint.formattedComplaintId} deleted successfully.'),
+          backgroundColor: const Color(0xFF16A34A),
+        ),
+      );
+      Navigator.pop(context, true);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isUpdating = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to delete complaint: $e')),
+      );
+    }
+  }
+
   Color _getStatusColor(String status) {
     switch (status.toUpperCase()) {
       case 'PENDING':
@@ -154,6 +202,13 @@ class _AdminComplaintDetailsScreenState extends State<AdminComplaintDetailsScree
         title: const Text('Admin Review'),
         backgroundColor: const Color(0xFF0F172A),
         foregroundColor: Colors.white,
+        actions: [
+          IconButton(
+            tooltip: 'Delete Complaint',
+            icon: const Icon(Icons.delete_outline, color: Color(0xFFF87171)),
+            onPressed: _isUpdating ? null : _confirmAndDelete,
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         child: Column(
@@ -230,6 +285,127 @@ class _AdminComplaintDetailsScreenState extends State<AdminComplaintDetailsScree
                     ],
                   ),
                   const SizedBox(height: 16),
+
+                  // Complainant & Submission Information Card
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.badge_outlined, size: 18, color: AppTheme.primaryColor),
+                            const SizedBox(width: 8),
+                            const Text(
+                              'Complainant & Filing Details',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A)),
+                            ),
+                            const Spacer(),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF1F5F9),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: const Color(0xFFCBD5E1), width: 0.8),
+                              ),
+                              child: Text(
+                                _complaint.formattedComplaintId,
+                                style: const TextStyle(
+                                  fontFamily: 'monospace',
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 11,
+                                  color: Color(0xFF0F172A),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            const Icon(Icons.person_outline, size: 16, color: Color(0xFF64748B)),
+                            const SizedBox(width: 8),
+                            const Text(
+                              'Complainant Name:',
+                              style: TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                _complaint.complainantDisplayName,
+                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (_complaint.userEmail != null && _complaint.userEmail!.isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              const Icon(Icons.email_outlined, size: 16, color: Color(0xFF64748B)),
+                              const SizedBox(width: 8),
+                              const Text(
+                                'Email:',
+                                style: TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  _complaint.userEmail!,
+                                  style: const TextStyle(fontSize: 12, color: Color(0xFF334155), fontWeight: FontWeight.w600),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            const Icon(Icons.access_time_outlined, size: 16, color: Color(0xFF64748B)),
+                            const SizedBox(width: 8),
+                            const Text(
+                              'Filing Date & Time:',
+                              style: TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                _complaint.formattedDateTime,
+                                style: const TextStyle(fontSize: 12, color: Color(0xFF0F172A), fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            const Icon(Icons.fingerprint, size: 16, color: Color(0xFF94A3B8)),
+                            const SizedBox(width: 8),
+                            const Text(
+                              'Complaint UUID:',
+                              style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                _complaint.id,
+                                style: const TextStyle(fontSize: 10, fontFamily: 'monospace', color: Color(0xFF64748B)),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
 
                   // Description
                   Text(
@@ -395,6 +571,22 @@ class _AdminComplaintDetailsScreenState extends State<AdminComplaintDetailsScree
                                     : () => _promptStatusUpdate('SOLVED'),
                                 icon: const Icon(Icons.check_circle_outline),
                                 label: const Text('MARK AS SOLVED'),
+                              ),
+                              const SizedBox(height: 10),
+
+                              // 4. Delete Complaint button
+                              OutlinedButton.icon(
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: AppTheme.priorityCritical,
+                                  side: const BorderSide(color: Color(0xFFFCA5A5)),
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                ),
+                                onPressed: _isUpdating ? null : _confirmAndDelete,
+                                icon: const Icon(Icons.delete_forever_outlined),
+                                label: const Text(
+                                  'DELETE COMPLAINT AS ADMIN',
+                                  style: TextStyle(fontWeight: FontWeight.bold),
+                                ),
                               ),
                             ],
                           ),

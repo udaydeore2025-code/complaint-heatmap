@@ -295,8 +295,9 @@ class _ComplaintDetailsScreenState extends State<ComplaintDetailsScreen> {
   Widget build(BuildContext context) {
     final statusColor = _getStatusColor(_complaint.status);
     final priorityColor = _getPriorityColor(_complaint.priorityLevel);
-    final currentUserId = _complaintRepository.currentUserId;
-    final isOwner = currentUserId != null && _complaint.userId == currentUserId;
+    final currentUserId = widget.userProfile?.id ?? _complaintRepository.currentUserId;
+    final isOwner = (currentUserId != null && _complaint.userId == currentUserId) ||
+        (widget.userProfile?.isAdmin == true);
 
     return Scaffold(
       backgroundColor: AppTheme.surfaceColor,
@@ -422,18 +423,66 @@ class _ComplaintDetailsScreenState extends State<ComplaintDetailsScreen> {
                   ),
                   const SizedBox(height: 8),
 
-                  // Reported Date
-                  Row(
-                    children: [
-                      const Icon(Icons.access_time, size: 14, color: Color(0xFF64748B)),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Reported ${_formatDateTime(_complaint.createdAt)}',
-                        style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-                      ),
-                    ],
+                  // Filing Details: Complaint ID, Complainant & Reported Date
+                  Container(
+                    margin: const EdgeInsets.only(top: 8, bottom: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFE2E8F0),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                _complaint.formattedComplaintId,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontFamily: 'monospace',
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF1E293B),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            const Icon(Icons.person_pin, size: 15, color: AppTheme.primaryColor),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                'Reported by ${_complaint.complainantDisplayName}${_complaint.userEmail != null ? ' (${_complaint.userEmail})' : ''}',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF334155),
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            const Icon(Icons.access_time, size: 14, color: Color(0xFF64748B)),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Filing Time: ${_formatDateTime(_complaint.createdAt)}',
+                              style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 16),
 
                   // Municipal Administrative Actions Panel (If Admin)
                   if (widget.userProfile?.isAdmin == true) ...[
