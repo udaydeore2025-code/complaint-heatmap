@@ -193,6 +193,74 @@ class _AdminComplaintDetailsScreenState extends State<AdminComplaintDetailsScree
     }
   }
 
+  Widget _buildComplaintPhoto() {
+    final url = _complaint.imageUrl;
+    if (url == null || url.trim().isEmpty) {
+      return Container(
+        height: 120,
+        color: const Color(0xFFF1F5F9),
+        child: const Center(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.image_not_supported_outlined, color: Color(0xFF94A3B8), size: 22),
+              SizedBox(width: 8),
+              Text(
+                'No photo attached with this complaint',
+                style: TextStyle(color: Color(0xFF64748B), fontSize: 13, fontWeight: FontWeight.w500),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final isHttp = url.startsWith('http://') || url.startsWith('https://');
+    if (!isHttp) {
+      return Container(
+        height: 120,
+        color: const Color(0xFFF1F5F9),
+        child: const Center(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.photo_outlined, color: Color(0xFF94A3B8), size: 22),
+              SizedBox(width: 8),
+              Text(
+                'Photo attached (offline file)',
+                style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      height: 220,
+      width: double.infinity,
+      color: Colors.black,
+      child: Image.network(
+        url,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => const Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.broken_image, size: 44, color: Colors.white54),
+              SizedBox(height: 6),
+              Text('Unable to load photo', style: TextStyle(color: Colors.white54, fontSize: 12)),
+            ],
+          ),
+        ),
+        loadingBuilder: (context, child, progress) {
+          if (progress == null) return child;
+          return const Center(child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2));
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final statusColor = _getStatusColor(_complaint.status);
@@ -201,7 +269,26 @@ class _AdminComplaintDetailsScreenState extends State<AdminComplaintDetailsScree
     return Scaffold(
       backgroundColor: AppTheme.surfaceColor,
       appBar: AppBar(
-        title: const Text('Admin Review'),
+        title: const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Admin Review',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+              ),
+            ),
+            Text(
+              'Issue Details & Municipal Actions',
+              style: TextStyle(
+                color: Colors.white70,
+                fontSize: 11,
+              ),
+            ),
+          ],
+        ),
         backgroundColor: const Color(0xFF0F172A),
         foregroundColor: Colors.white,
         actions: [
@@ -243,27 +330,19 @@ class _AdminComplaintDetailsScreenState extends State<AdminComplaintDetailsScree
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Photo if available
-            if (_complaint.imageUrl != null && _complaint.imageUrl!.isNotEmpty)
-              Container(
-                height: 220,
-                color: Colors.black,
-                child: Image.network(
-                  _complaint.imageUrl!,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) => const Center(
-                    child: Icon(Icons.broken_image, size: 48, color: Colors.white54),
-                  ),
-                ),
-              ),
+            // Safe Photo Loader
+            _buildComplaintPhoto(),
 
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Badges
-                  Row(
+                  // Badges - Wrap to prevent any RenderFlex overflow
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -276,8 +355,6 @@ class _AdminComplaintDetailsScreenState extends State<AdminComplaintDetailsScree
                           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
                         ),
                       ),
-                      const Spacer(),
-                      // Priority Score Badge
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                         decoration: BoxDecoration(
@@ -294,8 +371,6 @@ class _AdminComplaintDetailsScreenState extends State<AdminComplaintDetailsScree
                           ),
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      // Status Badge
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                         decoration: BoxDecoration(
@@ -314,6 +389,60 @@ class _AdminComplaintDetailsScreenState extends State<AdminComplaintDetailsScree
                     ],
                   ),
                   const SizedBox(height: 16),
+
+                  // Dedicated Complaint Description Card (PROMINENT)
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFCBD5E1)),
+                      boxShadow: const [
+                        BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 1)),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFEFF6FF),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(Icons.description, size: 18, color: Color(0xFF1E40AF)),
+                            ),
+                            const SizedBox(width: 8),
+                            const Text(
+                              'Complaint Description',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                                color: Color(0xFF0F172A),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                        const SizedBox(height: 12),
+                        SelectableText(
+                          _complaint.description.trim().isNotEmpty
+                              ? _complaint.description.trim()
+                              : 'No description provided.',
+                          style: const TextStyle(
+                            fontSize: 15,
+                            height: 1.5,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF1E293B),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
 
                   // Complainant & Submission Information Card
                   Container(
@@ -433,16 +562,6 @@ class _AdminComplaintDetailsScreenState extends State<AdminComplaintDetailsScree
                           ],
                         ),
                       ],
-                    ),
-                  ),
-
-                  // Description
-                  Text(
-                    _complaint.description,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF0F172A),
                     ),
                   ),
                   const SizedBox(height: 16),

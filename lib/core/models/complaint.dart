@@ -61,8 +61,8 @@ class Complaint {
           (json['profiles'] != null ? json['profiles']['name'] as String? : null),
       userEmail: json['user_email'] as String? ??
           (json['profiles'] != null ? json['profiles']['email'] as String? : null),
-      category: json['category'] as String,
-      description: json['description'] as String,
+      category: (json['category'] as String?) ?? 'General',
+      description: (json['description'] as String?) ?? 'No description provided',
       imageUrl: json['image_url'] as String?,
       latitude: (json['latitude'] as num).toDouble(),
       longitude: (json['longitude'] as num).toDouble(),

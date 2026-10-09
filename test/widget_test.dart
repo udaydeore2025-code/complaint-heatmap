@@ -849,6 +849,8 @@ void main() {
 
     expect(find.text('Complainant: Ramesh Patil'), findsOneWidget);
     expect(find.text('#CMP-COMP-ADM'), findsOneWidget);
+    expect(find.text('Issue Description:'), findsWidgets);
+    expect(find.text('Dangerous crater on expressway lane.'), findsWidgets);
   });
 
   testWidgets('AdminComplaintDetailsScreen displays Complainant & Filing Details card with Name, Email, and ID', (WidgetTester tester) async {
@@ -887,6 +889,8 @@ void main() {
     expect(find.text('ramesh@example.com'), findsOneWidget);
     expect(find.text('#CMP-COMPLAIN'), findsOneWidget);
     expect(find.text('Oct 9, 2026 at 10:30 AM'), findsOneWidget);
+    expect(find.text('Complaint Description'), findsOneWidget);
+    expect(find.text('Major road hazard near bus stop.'), findsOneWidget);
   });
 
   testWidgets('HomeFeedScreen deletes complaint and immediately removes it from the citizen dashboard feed', (WidgetTester tester) async {

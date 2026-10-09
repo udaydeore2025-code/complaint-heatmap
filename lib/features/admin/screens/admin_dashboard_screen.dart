@@ -663,20 +663,51 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                               ),
                                             ],
                                           ),
-                                          const SizedBox(height: 8),
-
-                                          // Description
-                                          Text(
-                                            complaint.description,
-                                            maxLines: 2,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w600,
-                                              color: Color(0xFF0F172A),
+                                          // Description box
+                                          Container(
+                                            width: double.infinity,
+                                            margin: const EdgeInsets.symmetric(vertical: 4),
+                                            padding: const EdgeInsets.all(10),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFF8FAFC),
+                                              borderRadius: BorderRadius.circular(8),
+                                              border: Border.all(color: const Color(0xFFE2E8F0)),
+                                            ),
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                const Row(
+                                                  children: [
+                                                    Icon(Icons.notes, size: 13, color: Color(0xFF64748B)),
+                                                    SizedBox(width: 4),
+                                                    Text(
+                                                      'Issue Description:',
+                                                      style: TextStyle(
+                                                        fontSize: 11,
+                                                        fontWeight: FontWeight.w700,
+                                                        color: Color(0xFF64748B),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                                const SizedBox(height: 4),
+                                                Text(
+                                                  complaint.description.trim().isNotEmpty
+                                                      ? complaint.description.trim()
+                                                      : 'No description provided',
+                                                  maxLines: 3,
+                                                  overflow: TextOverflow.ellipsis,
+                                                  style: const TextStyle(
+                                                    fontSize: 13,
+                                                    fontWeight: FontWeight.w600,
+                                                    color: Color(0xFF0F172A),
+                                                    height: 1.35,
+                                                  ),
+                                                ),
+                                              ],
                                             ),
                                           ),
-                                          const SizedBox(height: 8),
+                                          const SizedBox(height: 6),
 
                                           // Location address if available
                                           if (complaint.address != null && complaint.address!.isNotEmpty)
