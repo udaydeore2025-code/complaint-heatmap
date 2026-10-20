@@ -7,6 +7,8 @@ import '../../../core/repositories/complaint_repository.dart';
 import '../../../core/services/location_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../map/screens/complaint_map_screen.dart';
+import '../../../widgets/interactive_osm_card.dart';
 
 class ComplaintDetailsScreen extends StatefulWidget {
   final Complaint initialComplaint;
@@ -796,6 +798,27 @@ class _ComplaintDetailsScreenState extends State<ComplaintDetailsScreen> {
                             ],
                           ),
                         ],
+                        const SizedBox(height: 12),
+                        // Interactive OpenStreetMap Card
+                        InteractiveOsmCard(
+                          latitude: _complaint.latitude,
+                          longitude: _complaint.longitude,
+                          title: '${_complaint.category} Issue',
+                          category: _complaint.category,
+                          priorityLevel: _complaint.priorityLevel,
+                          height: 200,
+                          onExpandFullMap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (ctx) => ComplaintMapScreen(
+                                  complaintRepository: _complaintRepository,
+                                  initialComplaint: _complaint,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
                       ],
                     ),
                   ),

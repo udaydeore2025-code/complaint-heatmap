@@ -78,9 +78,18 @@ class _EmailLoginScreenState extends State<EmailLoginScreen> {
   }
 
   String _formatErrorMessage(Object error) {
+    final str = error.toString().toLowerCase();
+    if (str.contains('failed host lookup') ||
+        str.contains('socketexception') ||
+        str.contains('no address associated with hostname') ||
+        str.contains('clientexception')) {
+      return 'Cannot reach Supabase backend (Failed host lookup). Free-tier Supabase projects are automatically paused after 7 days of inactivity. Please restore/unpause your project at https://supabase.com/dashboard or check your internet connection.';
+    }
     if (error is AuthException) {
       final msg = error.message.toLowerCase();
-      if (msg.contains('invalid') || msg.contains('token')) {
+      if (msg.contains('failed host lookup') || msg.contains('socketexception')) {
+        return 'Cannot reach Supabase backend. Please restore/unpause your project in the Supabase dashboard.';
+      } else if (msg.contains('invalid') || msg.contains('token')) {
         return 'Invalid OTP code. Please verify the code and try again.';
       } else if (msg.contains('expired')) {
         return 'OTP has expired. Please request a new code.';
@@ -91,8 +100,7 @@ class _EmailLoginScreenState extends State<EmailLoginScreen> {
       }
       return error.message;
     }
-    final str = error.toString().toLowerCase();
-    if (str.contains('socket') || str.contains('network') || str.contains('failed host lookup')) {
+    if (str.contains('socket') || str.contains('network')) {
       return 'Network error. Please check your internet connection.';
     }
     return 'An unexpected error occurred. Please try again.';

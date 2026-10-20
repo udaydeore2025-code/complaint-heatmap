@@ -2,14 +2,26 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:latlong2/latlong.dart';
 import '../../../core/repositories/complaint_repository.dart';
 import '../../../core/services/location_service.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../widgets/interactive_map_picker_dialog.dart';
+import '../../../widgets/interactive_osm_card.dart';
 
 class ReportComplaintScreen extends StatefulWidget {
   final ComplaintRepository? complaintRepository;
+  final double? initialLatitude;
+  final double? initialLongitude;
+  final String? initialAddress;
 
-  const ReportComplaintScreen({super.key, this.complaintRepository});
+  const ReportComplaintScreen({
+    super.key,
+    this.complaintRepository,
+    this.initialLatitude,
+    this.initialLongitude,
+    this.initialAddress,
+  });
 
   @override
   State<ReportComplaintScreen> createState() => _ReportComplaintScreenState();
@@ -36,6 +48,15 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
   void initState() {
     super.initState();
     _complaintRepository = widget.complaintRepository ?? ComplaintRepository();
+    if (widget.initialLatitude != null && widget.initialLongitude != null) {
+      _latitude = widget.initialLatitude;
+      _longitude = widget.initialLongitude;
+      _locationStatusMessage =
+          'Coordinates selected from Civic Map: ${_latitude!.toStringAsFixed(4)}, ${_longitude!.toStringAsFixed(4)}';
+      if (widget.initialAddress != null) {
+        _addressController.text = widget.initialAddress!;
+      }
+    }
   }
 
   @override
@@ -128,6 +149,30 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
         _isFetchingLocation = false;
         _locationStatusMessage =
             'Unable to get GPS location. Please ensure location services are enabled and permissions granted.';
+      });
+    }
+  }
+
+  Future<void> _handlePickOnMap() async {
+    final initialPos = (_latitude != null && _longitude != null)
+        ? LatLng(_latitude!, _longitude!)
+        : null;
+
+    final result = await Navigator.push<LatLng>(
+      context,
+      MaterialPageRoute(
+        builder: (ctx) => InteractiveMapPickerDialog(
+          initialCenter: initialPos,
+        ),
+      ),
+    );
+
+    if (result != null && mounted) {
+      setState(() {
+        _latitude = result.latitude;
+        _longitude = result.longitude;
+        _locationStatusMessage =
+            'Coordinates pinned on map: ${_latitude!.toStringAsFixed(4)}, ${_longitude!.toStringAsFixed(4)}';
       });
     }
   }
@@ -346,7 +391,7 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
                 ),
                 const SizedBox(height: 10),
 
-                // Location action button
+                // Location action buttons
                 ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _latitude != null ? const Color(0xFF16A34A) : AppTheme.primaryColor,
@@ -363,9 +408,23 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
                     _latitude != null ? 'UPDATE CURRENT LOCATION' : 'USE CURRENT LOCATION',
                   ),
                 ),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppTheme.primaryColor,
+                    side: const BorderSide(color: AppTheme.primaryColor),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  onPressed: _handlePickOnMap,
+                  icon: const Icon(Icons.map_outlined),
+                  label: const Text(
+                    'PINPOINT ON INTERACTIVE MAP',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
                 const SizedBox(height: 12),
 
-                // Display Coordinates
+                // Display Coordinates & Mini Map
                 Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
@@ -406,6 +465,15 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
                         Text(
                           'Longitude: ${_longitude!.toStringAsFixed(6)}',
                           style: const TextStyle(fontSize: 13, fontFamily: 'monospace'),
+                        ),
+                        const SizedBox(height: 12),
+                        // Interactive Mini-Map Preview
+                        InteractiveOsmCard(
+                          latitude: _latitude!,
+                          longitude: _longitude!,
+                          title: '$_selectedCategory Location',
+                          category: _selectedCategory,
+                          height: 170,
                         ),
                       ],
                       if (_locationStatusMessage != null) ...[

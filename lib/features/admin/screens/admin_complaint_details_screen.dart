@@ -4,6 +4,7 @@ import '../../../core/models/complaint_update.dart';
 import '../../../core/repositories/admin_repository.dart';
 import '../../../core/services/map_launcher_service.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../widgets/interactive_osm_card.dart';
 import 'admin_map_screen.dart';
 
 class AdminComplaintDetailsScreen extends StatefulWidget {
@@ -691,6 +692,28 @@ class _AdminComplaintDetailsScreenState extends State<AdminComplaintDetailsScree
                         Text(
                           'Longitude: ${_complaint.longitude.toStringAsFixed(6)}',
                           style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+                        ),
+                        const SizedBox(height: 12),
+                        // Interactive OpenStreetMap Mini Card
+                        InteractiveOsmCard(
+                          latitude: _complaint.latitude,
+                          longitude: _complaint.longitude,
+                          title: '${_complaint.category} (${_complaint.formattedComplaintId})',
+                          category: _complaint.category,
+                          priorityLevel: _complaint.priorityLevel,
+                          geofenceRadiusMeters: _complaint.locationGroupId != null ? 50.0 : null,
+                          height: 190,
+                          onExpandFullMap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (ctx) => AdminMapScreen(
+                                  adminRepository: _adminRepository,
+                                  initialComplaint: _complaint,
+                                ),
+                              ),
+                            );
+                          },
                         ),
                         const SizedBox(height: 14),
                         const Divider(height: 1, color: Color(0xFFF1F5F9)),
