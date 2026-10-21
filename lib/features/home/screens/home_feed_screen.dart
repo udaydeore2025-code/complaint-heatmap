@@ -6,6 +6,7 @@ import '../../../core/repositories/auth_repository.dart';
 import '../../../core/repositories/complaint_repository.dart';
 import '../../../core/services/location_service.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../widgets/app_logo.dart';
 import '../../../widgets/complaint_card.dart';
 import '../../complaints/screens/report_complaint_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -182,32 +183,40 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     return Scaffold(
       backgroundColor: AppTheme.surfaceColor,
       appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        title: Row(
           children: [
-            const Text(
-              AppConstants.appName,
-              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 19),
-            ),
-            Row(
-              children: [
-                Icon(
-                  _currentLocation != null ? Icons.my_location : Icons.location_off_outlined,
-                  size: 11,
-                  color: _currentLocation != null ? AppTheme.primaryColor : const Color(0xFF94A3B8),
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  _currentLocation != null
-                      ? 'GPS active • Nearby prioritized'
-                      : 'GPS inactive • Sorting by Latest',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                    color: Color(0xFF64748B),
+            const AppLogo(size: 34, showBadgeBackground: true),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    AppConstants.appName,
+                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 19),
                   ),
-                ),
-              ],
+                  Row(
+                    children: [
+                      Icon(
+                        _currentLocation != null ? Icons.my_location : Icons.location_off_outlined,
+                        size: 11,
+                        color: _currentLocation != null ? AppTheme.primaryColor : const Color(0xFF94A3B8),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        _currentLocation != null
+                            ? 'GPS active • Nearby prioritized'
+                            : 'GPS inactive • Sorting by Latest',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF64748B),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ],
         ),

@@ -4,6 +4,7 @@ import '../../../core/models/user_profile.dart';
 import '../../../core/repositories/auth_repository.dart';
 import '../../../core/repositories/complaint_repository.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../widgets/app_logo.dart';
 import '../../complaints/screens/my_complaints_screen.dart';
 import '../../map/screens/complaint_map_screen.dart';
 
@@ -231,7 +232,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             const SizedBox(height: 24),
 
-            // App Version Badge
+            // App Logo & Version Badge
+            const Center(child: AppLogo(size: 64, showBadgeBackground: true)),
+            const SizedBox(height: 12),
             const Text(
               '${AppConstants.appName} • ${AppConstants.appTagline}',
               style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8), fontWeight: FontWeight.w600),

@@ -207,6 +207,9 @@ class FakeAdminRepository extends AdminRepository {
   String? deletedComplaintId;
 
   @override
+  Future<Complaint?> fetchComplaintById(String complaintId) async => null;
+
+  @override
   Future<void> deleteComplaint(String complaintId) async {
     deletedComplaintId = complaintId;
   }
@@ -1257,5 +1260,57 @@ void main() {
     expect(find.text('OSM Web'), findsWidgets);
     expect(find.text('Review'), findsWidgets);
     expect(find.text('Dangerous crater on expressway lane.'), findsOneWidget);
+  });
+
+  testWidgets('AdminComplaintDetailsScreen renders without overflow on compact mobile screen width (360x780)', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(360, 780);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    final testComplaint = Complaint(
+      id: 'compact-phone-comp-1234',
+      userId: 'user-compact-phone',
+      userName: 'Uday Deore Municipal Worker',
+      userEmail: 'udaydeore2025@gmail.com',
+      category: 'Water Supply Issue',
+      description: 'Major pipeline breakdown causing massive water leakage across main road intersection.',
+      latitude: 18.5204,
+      longitude: 73.8567,
+      severity: 'CRITICAL',
+      priorityScore: 92.5,
+      priorityLevel: 'CRITICAL',
+      status: 'WORK IN PROGRESS',
+      upvoteCount: 15,
+      downvoteCount: 0,
+      confirmationCount: 8,
+      relatedComplaintCount: 2,
+      createdAt: DateTime(2026, 10, 15, 14, 25),
+      updatedAt: DateTime(2026, 10, 15, 14, 25),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AdminComplaintDetailsScreen(
+          complaint: testComplaint,
+          adminRepository: FakeAdminRepository(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Verify all core sections render without layout exception on 360-wide screen
+    expect(find.text('Admin Review'), findsOneWidget);
+    expect(find.text('Issue Details & Municipal Actions'), findsOneWidget);
+    expect(find.text('Complaint Description'), findsOneWidget);
+    expect(find.text('Major pipeline breakdown causing massive water leakage across main road intersection.'), findsOneWidget);
+    expect(find.text('Complainant & Filing Details'), findsOneWidget);
+    expect(find.text('Uday Deore Municipal Worker'), findsOneWidget);
+    expect(find.text('udaydeore2025@gmail.com'), findsOneWidget);
+    expect(find.text('Exact Location & Coordinates'), findsOneWidget);
+    expect(find.text('Administrative Actions'), findsOneWidget);
+    expect(find.text('DELETE COMPLAINT AS ADMIN'), findsOneWidget);
   });
 }

@@ -231,6 +231,79 @@ class AdminRepository {
     }
   }
 
+  /// Fetches a single complaint by its ID with full details & live metrics
+  Future<Complaint?> fetchComplaintById(String complaintId) async {
+    try {
+      final row = await client
+          .from(SupabaseConstants.complaintsTable)
+          .select()
+          .eq('id', complaintId)
+          .maybeSingle();
+
+      if (row == null) return null;
+
+      final complaint = Complaint.fromJson(row);
+
+      // Complainant profile
+      String? userName = complaint.userName;
+      String? userEmail = complaint.userEmail;
+      if (complaint.userId.isNotEmpty) {
+        try {
+          final profileRow = await client
+              .from(SupabaseConstants.profilesTable)
+              .select('name, email')
+              .eq('id', complaint.userId)
+              .maybeSingle();
+          if (profileRow != null) {
+            userName = profileRow['name'] as String? ?? userName;
+            userEmail = profileRow['email'] as String? ?? userEmail;
+          }
+        } catch (e) {
+          debugPrint('Notice: Error fetching profile in admin details: $e');
+        }
+      }
+
+      // Votes
+      int upvotes = 0;
+      int downvotes = 0;
+      try {
+        final List<dynamic> voteRows = await client
+            .from(SupabaseConstants.votesTable)
+            .select('vote_type')
+            .eq('complaint_id', complaintId);
+        for (final v in voteRows) {
+          if (v['vote_type'] == 'UPVOTE') upvotes++;
+          if (v['vote_type'] == 'DOWNVOTE') downvotes++;
+        }
+      } catch (e) {
+        debugPrint('Notice: Error fetching votes in admin details: $e');
+      }
+
+      // Confirmations
+      int confirmations = 0;
+      try {
+        final List<dynamic> confRows = await client
+            .from(SupabaseConstants.confirmationsTable)
+            .select('id')
+            .eq('complaint_id', complaintId);
+        confirmations = confRows.length;
+      } catch (e) {
+        debugPrint('Notice: Error fetching confirmations in admin details: $e');
+      }
+
+      return complaint.copyWith(
+        userName: userName,
+        userEmail: userEmail,
+        upvoteCount: upvotes,
+        downvoteCount: downvotes,
+        confirmationCount: confirmations,
+      );
+    } catch (e) {
+      debugPrint('Error fetching complaint by ID in AdminRepository: $e');
+      return null;
+    }
+  }
+
   /// Permanently deletes a complaint and all associated records (admin authority)
   Future<void> deleteComplaint(String complaintId) async {
     final user = client.auth.currentUser;

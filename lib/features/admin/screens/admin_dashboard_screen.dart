@@ -5,6 +5,7 @@ import '../../../core/repositories/admin_repository.dart';
 import '../../../core/repositories/auth_repository.dart';
 import '../../../core/services/map_launcher_service.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../widgets/app_logo.dart';
 import 'admin_complaint_details_screen.dart';
 import 'admin_map_screen.dart';
 
@@ -225,16 +226,22 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     return Scaffold(
       backgroundColor: AppTheme.surfaceColor,
       appBar: AppBar(
-        title: const Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        title: const Row(
           children: [
-            Text(
-              'Admin Console',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            Text(
-              'CivicConnect Municipal Portal',
-              style: TextStyle(fontSize: 11, color: Colors.white70),
+            AppLogo(size: 32, showBadgeBackground: true),
+            SizedBox(width: 10),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Admin Console',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  'CivicConnect Municipal Portal',
+                  style: TextStyle(fontSize: 11, color: Colors.white70),
+                ),
+              ],
             ),
           ],
         ),

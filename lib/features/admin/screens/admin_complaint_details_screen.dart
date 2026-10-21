@@ -1,10 +1,10 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../../core/models/complaint.dart';
 import '../../../core/models/complaint_update.dart';
 import '../../../core/repositories/admin_repository.dart';
 import '../../../core/services/map_launcher_service.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../../widgets/interactive_osm_card.dart';
 import 'admin_map_screen.dart';
 
 class AdminComplaintDetailsScreen extends StatefulWidget {
@@ -35,6 +35,20 @@ class _AdminComplaintDetailsScreenState extends State<AdminComplaintDetailsScree
     _complaint = widget.complaint;
     _adminRepository = widget.adminRepository ?? AdminRepository();
     _loadHistory();
+    _loadFreshDetails();
+  }
+
+  Future<void> _loadFreshDetails() async {
+    try {
+      final fresh = await _adminRepository.fetchComplaintById(_complaint.id);
+      if (fresh != null && mounted) {
+        setState(() {
+          _complaint = fresh;
+        });
+      }
+    } catch (e) {
+      debugPrint('Notice: Error refreshing complaint details: $e');
+    }
   }
 
   Future<void> _loadHistory() async {
@@ -209,25 +223,70 @@ class _AdminComplaintDetailsScreenState extends State<AdminComplaintDetailsScree
       if (url != null && url.trim().isNotEmpty) {
         final trimmed = url.trim();
         final uri = Uri.tryParse(trimmed);
-        if (uri != null && (uri.scheme == 'http' || uri.scheme == 'https')) {
+        final isHttp = uri != null && (uri.scheme == 'http' || uri.scheme == 'https');
+        bool isLocalFile = false;
+        if (!isHttp && (trimmed.startsWith('/') || trimmed.startsWith('file:') || trimmed.contains(Platform.pathSeparator))) {
+          try {
+            isLocalFile = File(trimmed).existsSync();
+          } catch (_) {
+            isLocalFile = false;
+          }
+        }
+
+        if (isHttp || isLocalFile) {
           return Container(
-            height: 220,
+            height: 240,
             width: double.infinity,
             color: Colors.black,
-            child: Image.network(
-              trimmed,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) => const Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.broken_image, size: 44, color: Colors.white54),
-                    SizedBox(height: 6),
-                    Text('Unable to load photo', style: TextStyle(color: Colors.white54, fontSize: 12)),
-                  ],
-                ),
-              ),
-            ),
+            child: isHttp
+                ? Image.network(
+                    trimmed,
+                    fit: BoxFit.cover,
+                    loadingBuilder: (context, child, loadingProgress) {
+                      if (loadingProgress == null) return child;
+                      return const Center(
+                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                      );
+                    },
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      height: 140,
+                      color: const Color(0xFFF1F5F9),
+                      child: const Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.broken_image_outlined, size: 40, color: Color(0xFF94A3B8)),
+                            SizedBox(height: 6),
+                            Text(
+                              'Unable to load photo',
+                              style: TextStyle(color: Color(0xFF64748B), fontSize: 12),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  )
+                : Image.file(
+                    File(trimmed),
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      height: 140,
+                      color: const Color(0xFFF1F5F9),
+                      child: const Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.broken_image_outlined, size: 40, color: Color(0xFF94A3B8)),
+                            SizedBox(height: 6),
+                            Text(
+                              'Unable to load offline photo',
+                              style: TextStyle(color: Color(0xFF64748B), fontSize: 12),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
           );
         }
       }
@@ -236,20 +295,25 @@ class _AdminComplaintDetailsScreenState extends State<AdminComplaintDetailsScree
     }
 
     return Container(
-      height: 120,
+      height: 140,
       width: double.infinity,
       color: const Color(0xFFF1F5F9),
       child: const Center(
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.photo_outlined, color: Color(0xFF94A3B8), size: 22),
-            SizedBox(width: 8),
-            Text(
-              'No photo attached with this complaint',
-              style: TextStyle(color: Color(0xFF64748B), fontSize: 13, fontWeight: FontWeight.w500),
-            ),
-          ],
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: 16),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.photo_camera_back_outlined, color: Color(0xFF94A3B8), size: 38),
+              SizedBox(height: 8),
+              Text(
+                'No photo attached with this complaint',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Color(0xFF64748B), fontSize: 13, fontWeight: FontWeight.w500),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -377,7 +441,7 @@ class _AdminComplaintDetailsScreenState extends State<AdminComplaintDetailsScree
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   // Badges - Wrap to prevent any RenderFlex overflow
                   Wrap(
@@ -457,12 +521,14 @@ class _AdminComplaintDetailsScreenState extends State<AdminComplaintDetailsScree
                               child: const Icon(Icons.description, size: 18, color: Color(0xFF1E40AF)),
                             ),
                             const SizedBox(width: 8),
-                            const Text(
-                              'Complaint Description',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                                color: Color(0xFF0F172A),
+                            const Expanded(
+                              child: Text(
+                                'Complaint Description',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                  color: Color(0xFF0F172A),
+                                ),
                               ),
                             ),
                           ],
@@ -501,11 +567,14 @@ class _AdminComplaintDetailsScreenState extends State<AdminComplaintDetailsScree
                           children: [
                             const Icon(Icons.badge_outlined, size: 18, color: AppTheme.primaryColor),
                             const SizedBox(width: 8),
-                            const Text(
-                              'Complainant & Filing Details',
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A)),
+                            const Expanded(
+                              child: Text(
+                                'Complainant & Filing Details',
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A)),
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
-                            const Spacer(),
+                            const SizedBox(width: 8),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                               decoration: BoxDecoration(
@@ -529,14 +598,14 @@ class _AdminComplaintDetailsScreenState extends State<AdminComplaintDetailsScree
                         const Divider(height: 1, color: Color(0xFFF1F5F9)),
                         const SizedBox(height: 10),
                         Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Icon(Icons.person_outline, size: 16, color: Color(0xFF64748B)),
                             const SizedBox(width: 8),
                             const Text(
-                              'Complainant Name:',
+                              'Complainant Name: ',
                               style: TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
                             ),
-                            const SizedBox(width: 6),
                             Expanded(
                               child: Text(
                                 _complaint.complainantDisplayName,
@@ -546,16 +615,16 @@ class _AdminComplaintDetailsScreenState extends State<AdminComplaintDetailsScree
                           ],
                         ),
                         if (_complaint.userEmail != null && _complaint.userEmail!.isNotEmpty) ...[
-                          const SizedBox(height: 6),
+                          const SizedBox(height: 8),
                           Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const Icon(Icons.email_outlined, size: 16, color: Color(0xFF64748B)),
                               const SizedBox(width: 8),
                               const Text(
-                                'Email:',
+                                'Email: ',
                                 style: TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
                               ),
-                              const SizedBox(width: 6),
                               Expanded(
                                 child: Text(
                                   _complaint.userEmail!,
@@ -565,16 +634,16 @@ class _AdminComplaintDetailsScreenState extends State<AdminComplaintDetailsScree
                             ],
                           ),
                         ],
-                        const SizedBox(height: 6),
+                        const SizedBox(height: 8),
                         Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Icon(Icons.access_time_outlined, size: 16, color: Color(0xFF64748B)),
                             const SizedBox(width: 8),
                             const Text(
-                              'Filing Date & Time:',
+                              'Filing Date & Time: ',
                               style: TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
                             ),
-                            const SizedBox(width: 6),
                             Expanded(
                               child: Text(
                                 _complaint.formattedDateTime,
@@ -583,21 +652,20 @@ class _AdminComplaintDetailsScreenState extends State<AdminComplaintDetailsScree
                             ),
                           ],
                         ),
-                        const SizedBox(height: 6),
+                        const SizedBox(height: 8),
                         Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Icon(Icons.fingerprint, size: 16, color: Color(0xFF94A3B8)),
                             const SizedBox(width: 8),
                             const Text(
-                              'Complaint UUID:',
+                              'Complaint UUID: ',
                               style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
                             ),
-                            const SizedBox(width: 6),
                             Expanded(
                               child: Text(
                                 _complaint.id,
                                 style: const TextStyle(fontSize: 10, fontFamily: 'monospace', color: Color(0xFF64748B)),
-                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                           ],
@@ -609,51 +677,55 @@ class _AdminComplaintDetailsScreenState extends State<AdminComplaintDetailsScree
 
                   // Metrics Card: Upvotes, Downvotes, Confirmations, Related
                   Container(
-                    padding: const EdgeInsets.all(14),
+                    margin: const EdgeInsets.only(bottom: 16),
+                    padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: const Color(0xFFE2E8F0)),
                     ),
-                    child: Column(
+                    child: Row(
                       children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceAround,
-                          children: [
-                            Column(
-                              children: [
-                                const Text('Upvotes', style: TextStyle(color: Color(0xFF64748B), fontSize: 11)),
-                                const SizedBox(height: 4),
-                                Text('${_complaint.upvoteCount}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                              ],
-                            ),
-                            Column(
-                              children: [
-                                const Text('Downvotes', style: TextStyle(color: Color(0xFF64748B), fontSize: 11)),
-                                const SizedBox(height: 4),
-                                Text('${_complaint.downvoteCount}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                              ],
-                            ),
-                            Column(
-                              children: [
-                                const Text('Confirmations', style: TextStyle(color: Color(0xFF64748B), fontSize: 11)),
-                                const SizedBox(height: 4),
-                                Text('${_complaint.confirmationCount}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                              ],
-                            ),
-                            Column(
-                              children: [
-                                const Text('Related Issues', style: TextStyle(color: Color(0xFF64748B), fontSize: 11)),
-                                const SizedBox(height: 4),
-                                Text('${_complaint.relatedComplaintCount}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                              ],
-                            ),
-                          ],
+                        Expanded(
+                          child: Column(
+                            children: [
+                              const Text('Upvotes', style: TextStyle(color: Color(0xFF64748B), fontSize: 11)),
+                              const SizedBox(height: 4),
+                              Text('${_complaint.upvoteCount}', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                        ),
+                        Expanded(
+                          child: Column(
+                            children: [
+                              const Text('Downvotes', style: TextStyle(color: Color(0xFF64748B), fontSize: 11)),
+                              const SizedBox(height: 4),
+                              Text('${_complaint.downvoteCount}', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                        ),
+                        Expanded(
+                          child: Column(
+                            children: [
+                              const Text('Confirmations', style: TextStyle(color: Color(0xFF64748B), fontSize: 11)),
+                              const SizedBox(height: 4),
+                              Text('${_complaint.confirmationCount}', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                        ),
+                        Expanded(
+                          child: Column(
+                            children: [
+                              const Text('Related Issues', style: TextStyle(color: Color(0xFF64748B), fontSize: 11)),
+                              const SizedBox(height: 4),
+                              Text('${_complaint.relatedComplaintCount}', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 4),
 
                   // Exact Location Pinpoint Card
                   const Text(
@@ -694,47 +766,104 @@ class _AdminComplaintDetailsScreenState extends State<AdminComplaintDetailsScree
                           style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
                         ),
                         const SizedBox(height: 12),
-                        // Interactive OpenStreetMap Mini Card
-                        InteractiveOsmCard(
-                          latitude: _complaint.latitude,
-                          longitude: _complaint.longitude,
-                          title: '${_complaint.category} (${_complaint.formattedComplaintId})',
-                          category: _complaint.category,
-                          priorityLevel: _complaint.priorityLevel,
-                          geofenceRadiusMeters: _complaint.locationGroupId != null ? 50.0 : null,
-                          height: 190,
-                          onExpandFullMap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (ctx) => AdminMapScreen(
-                                  adminRepository: _adminRepository,
-                                  initialComplaint: _complaint,
+                        // Location Pinpoint & Map Card
+                        Container(
+                          height: 140,
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF0FDF4),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: const Color(0xFFBBF7D0)),
+                          ),
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(12),
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (ctx) => AdminMapScreen(
+                                      adminRepository: _adminRepository,
+                                      initialComplaint: _complaint,
+                                    ),
+                                  ),
+                                );
+                              },
+                              child: Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(10),
+                                      decoration: BoxDecoration(
+                                        color: _getPriorityColor(_complaint.priorityLevel),
+                                        shape: BoxShape.circle,
+                                        boxShadow: const [
+                                          BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 2)),
+                                        ],
+                                      ),
+                                      child: const Icon(Icons.location_on, color: Colors.white, size: 28),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                                      child: FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        child: Text(
+                                          '${_complaint.category} Pinpoint (${_complaint.latitude.toStringAsFixed(4)}, ${_complaint.longitude.toStringAsFixed(4)})',
+                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF14532D)),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    const Padding(
+                                      padding: EdgeInsets.symmetric(horizontal: 8),
+                                      child: FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(Icons.touch_app, size: 14, color: Color(0xFF16A34A)),
+                                            SizedBox(width: 4),
+                                            Text(
+                                              'Tap to open in Interactive Hotspot Map',
+                                              style: TextStyle(fontSize: 12, color: Color(0xFF16A34A), fontWeight: FontWeight.w600),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                            );
-                          },
+                            ),
+                          ),
                         ),
                         const SizedBox(height: 14),
                         const Divider(height: 1, color: Color(0xFFF1F5F9)),
                         const SizedBox(height: 12),
-                        // Prominent Google Maps Navigation Option
                         // Navigation & OpenStreetMap Options
                         Row(
                           children: [
                             Expanded(
+                              flex: 3,
                               child: ElevatedButton.icon(
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: const Color(0xFF1E40AF),
                                   foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
+                                  minimumSize: const Size(0, 46),
+                                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                   elevation: 2,
                                 ),
-                                icon: const Icon(Icons.navigation, size: 17),
-                                label: const Text(
-                                  'Navigate in Google Maps',
-                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                icon: const Icon(Icons.navigation, size: 16),
+                                label: const FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text(
+                                    'Navigate in Google Maps',
+                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                                  ),
                                 ),
                                 onPressed: () {
                                   MapLauncherService.navigateToCoordinates(
@@ -747,23 +876,30 @@ class _AdminComplaintDetailsScreenState extends State<AdminComplaintDetailsScree
                               ),
                             ),
                             const SizedBox(width: 8),
-                            OutlinedButton.icon(
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: const Color(0xFF0F172A),
-                                side: const BorderSide(color: Color(0xFFCBD5E1)),
-                                backgroundColor: const Color(0xFFF8FAFC),
-                                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            Expanded(
+                              flex: 1,
+                              child: OutlinedButton.icon(
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: const Color(0xFF0F172A),
+                                  side: const BorderSide(color: Color(0xFFCBD5E1)),
+                                  backgroundColor: const Color(0xFFF8FAFC),
+                                  minimumSize: const Size(0, 46),
+                                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                ),
+                                icon: const Icon(Icons.open_in_browser, size: 16),
+                                label: const FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text('OSM', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                ),
+                                onPressed: () {
+                                  MapLauncherService.openInOpenStreetMap(
+                                    latitude: _complaint.latitude,
+                                    longitude: _complaint.longitude,
+                                    context: context,
+                                  );
+                                },
                               ),
-                              icon: const Icon(Icons.open_in_browser, size: 16),
-                              label: const Text('OSM', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                              onPressed: () {
-                                MapLauncherService.openInOpenStreetMap(
-                                  latitude: _complaint.latitude,
-                                  longitude: _complaint.longitude,
-                                  context: context,
-                                );
-                              },
                             ),
                           ],
                         ),
@@ -776,6 +912,7 @@ class _AdminComplaintDetailsScreenState extends State<AdminComplaintDetailsScree
                                   foregroundColor: const Color(0xFF0F172A),
                                   side: const BorderSide(color: Color(0xFFCBD5E1)),
                                   backgroundColor: const Color(0xFFF8FAFC),
+                                  minimumSize: const Size(0, 44),
                                   padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                 ),
@@ -828,60 +965,88 @@ class _AdminComplaintDetailsScreenState extends State<AdminComplaintDetailsScree
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
                               // 1. Verify button
-                              ElevatedButton.icon(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF0284C7),
-                                  foregroundColor: Colors.white,
-                                ),
-                                onPressed: _complaint.status == 'VERIFIED'
-                                    ? null
-                                    : () => _promptStatusUpdate('VERIFIED'),
-                                icon: const Icon(Icons.verified),
-                                label: const Text('MARK AS VERIFIED'),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: ElevatedButton.icon(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(0xFF0284C7),
+                                        foregroundColor: Colors.white,
+                                        minimumSize: const Size(0, 48),
+                                      ),
+                                      onPressed: _complaint.status == 'VERIFIED'
+                                          ? null
+                                          : () => _promptStatusUpdate('VERIFIED'),
+                                      icon: const Icon(Icons.verified),
+                                      label: const Text('MARK AS VERIFIED'),
+                                    ),
+                                  ),
+                                ],
                               ),
                               const SizedBox(height: 10),
 
                               // 2. Work In Progress button
-                              ElevatedButton.icon(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF8B5CF6),
-                                  foregroundColor: Colors.white,
-                                ),
-                                onPressed: _complaint.status == 'WORK IN PROGRESS'
-                                    ? null
-                                    : () => _promptStatusUpdate('WORK IN PROGRESS'),
-                                icon: const Icon(Icons.engineering_outlined),
-                                label: const Text('MARK AS WORK IN PROGRESS'),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: ElevatedButton.icon(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(0xFF8B5CF6),
+                                        foregroundColor: Colors.white,
+                                        minimumSize: const Size(0, 48),
+                                      ),
+                                      onPressed: _complaint.status == 'WORK IN PROGRESS'
+                                          ? null
+                                          : () => _promptStatusUpdate('WORK IN PROGRESS'),
+                                      icon: const Icon(Icons.engineering_outlined),
+                                      label: const Text('MARK AS WORK IN PROGRESS'),
+                                    ),
+                                  ),
+                                ],
                               ),
                               const SizedBox(height: 10),
 
                               // 3. Solved button
-                              ElevatedButton.icon(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF10B981),
-                                  foregroundColor: Colors.white,
-                                ),
-                                onPressed: _complaint.status == 'SOLVED'
-                                    ? null
-                                    : () => _promptStatusUpdate('SOLVED'),
-                                icon: const Icon(Icons.check_circle_outline),
-                                label: const Text('MARK AS SOLVED'),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: ElevatedButton.icon(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(0xFF10B981),
+                                        foregroundColor: Colors.white,
+                                        minimumSize: const Size(0, 48),
+                                      ),
+                                      onPressed: _complaint.status == 'SOLVED'
+                                          ? null
+                                          : () => _promptStatusUpdate('SOLVED'),
+                                      icon: const Icon(Icons.check_circle_outline),
+                                      label: const Text('MARK AS SOLVED'),
+                                    ),
+                                  ),
+                                ],
                               ),
                               const SizedBox(height: 10),
 
                               // 4. Delete Complaint button
-                              OutlinedButton.icon(
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: AppTheme.priorityCritical,
-                                  side: const BorderSide(color: Color(0xFFFCA5A5)),
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
-                                ),
-                                onPressed: _isUpdating ? null : _confirmAndDelete,
-                                icon: const Icon(Icons.delete_forever_outlined),
-                                label: const Text(
-                                  'DELETE COMPLAINT AS ADMIN',
-                                  style: TextStyle(fontWeight: FontWeight.bold),
-                                ),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: OutlinedButton.icon(
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor: AppTheme.priorityCritical,
+                                        side: const BorderSide(color: Color(0xFFFCA5A5)),
+                                        minimumSize: const Size(0, 48),
+                                        padding: const EdgeInsets.symmetric(vertical: 12),
+                                      ),
+                                      onPressed: _isUpdating ? null : _confirmAndDelete,
+                                      icon: const Icon(Icons.delete_forever_outlined),
+                                      label: const Text(
+                                        'DELETE COMPLAINT AS ADMIN',
+                                        style: TextStyle(fontWeight: FontWeight.bold),
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ),

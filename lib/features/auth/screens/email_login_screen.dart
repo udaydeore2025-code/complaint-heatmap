@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/repositories/auth_repository.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../widgets/app_logo.dart';
 
 class EmailLoginScreen extends StatefulWidget {
   final AuthRepository? authRepository;
@@ -448,25 +449,50 @@ class _EmailLoginScreenState extends State<EmailLoginScreen> {
                   const SizedBox(height: 20),
                 ],
 
-                // Role Header Icon
+                // App Logo & Role Header
                 Center(
-                  child: Container(
-                    width: 72,
-                    height: 72,
-                    decoration: BoxDecoration(
-                      color: isAdminMode
-                          ? const Color(0xFFFEE2E2)
-                          : AppTheme.primaryColor.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Icon(
-                      isAdminMode ? Icons.admin_panel_settings : Icons.mark_email_read_outlined,
-                      color: isAdminMode ? AppTheme.priorityCritical : AppTheme.primaryColor,
-                      size: 38,
-                    ),
+                  child: Column(
+                    children: [
+                      const AppLogo(size: 96, showBadgeBackground: true),
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: isAdminMode
+                              ? const Color(0xFFFEE2E2)
+                              : AppTheme.primaryColor.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: isAdminMode
+                                ? const Color(0xFFFCA5A5)
+                                : AppTheme.primaryColor.withValues(alpha: 0.25),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              isAdminMode ? Icons.admin_panel_settings : Icons.verified_user_outlined,
+                              size: 14,
+                              color: isAdminMode ? AppTheme.priorityCritical : AppTheme.primaryColor,
+                            ),
+                            const SizedBox(width: 5),
+                            Text(
+                              isAdminMode ? 'MUNICIPAL ADMIN PORTAL' : 'CIVIC CITIZEN PORTAL',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.5,
+                                color: isAdminMode ? AppTheme.priorityCritical : AppTheme.primaryColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 18),
+                const SizedBox(height: 16),
 
                 // Title
                 Text(

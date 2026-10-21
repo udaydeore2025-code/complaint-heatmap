@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../widgets/app_logo.dart';
 
 class SplashScreen extends StatefulWidget {
   final VoidCallback? onFinished;
@@ -48,27 +49,11 @@ class _SplashScreenState extends State<SplashScreen> {
             children: [
               const Spacer(),
               // App Logo / Icon
-              Container(
-                width: 100,
-                height: 100,
-                decoration: BoxDecoration(
-                  color: AppTheme.primaryColor,
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppTheme.primaryColor.withValues(alpha: 0.3),
-                      blurRadius: 20,
-                      offset: const Offset(0, 10),
-                    ),
-                  ],
-                ),
-                child: const Icon(
-                  Icons.location_city_rounded,
-                  size: 54,
-                  color: Colors.white,
-                ),
+              const AppLogo(
+                size: 130,
+                showBadgeBackground: true,
               ),
-              const SizedBox(height: 28),
+              const SizedBox(height: 24),
               // App Title
               Text(
                 AppConstants.appName,

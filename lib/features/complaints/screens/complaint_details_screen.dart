@@ -357,7 +357,10 @@ class _ComplaintDetailsScreenState extends State<ComplaintDetailsScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Category, Priority, and Status Badges
-                  Row(
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -374,7 +377,6 @@ class _ComplaintDetailsScreenState extends State<ComplaintDetailsScreen> {
                           ),
                         ),
                       ),
-                      const Spacer(),
                       // Priority Badge
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -392,7 +394,6 @@ class _ComplaintDetailsScreenState extends State<ComplaintDetailsScreen> {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 8),
                       // Status Badge
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -552,17 +553,20 @@ class _ComplaintDetailsScreenState extends State<ComplaintDetailsScreen> {
                                         ? const Color(0xFF334155)
                                         : const Color(0xFF0284C7),
                                     foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(vertical: 10),
+                                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                   ),
                                   icon: const Icon(Icons.verified, size: 16),
-                                  label: const Text('Verify', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                                  label: const FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    child: Text('Verify', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                                  ),
                                   onPressed: (_isActionInProgress || _complaint.status == 'VERIFIED')
                                       ? null
                                       : () => _promptAdminStatusUpdate('VERIFIED'),
                                 ),
                               ),
-                              const SizedBox(width: 8),
+                              const SizedBox(width: 6),
                               Expanded(
                                 child: ElevatedButton.icon(
                                   style: ElevatedButton.styleFrom(
@@ -570,17 +574,20 @@ class _ComplaintDetailsScreenState extends State<ComplaintDetailsScreen> {
                                         ? const Color(0xFF334155)
                                         : const Color(0xFF8B5CF6),
                                     foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(vertical: 10),
+                                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                   ),
                                   icon: const Icon(Icons.engineering_outlined, size: 16),
-                                  label: const Text('In Progress', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                                  label: const FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    child: Text('In Progress', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                                  ),
                                   onPressed: (_isActionInProgress || _complaint.status == 'WORK IN PROGRESS')
                                       ? null
                                       : () => _promptAdminStatusUpdate('WORK IN PROGRESS'),
                                 ),
                               ),
-                              const SizedBox(width: 8),
+                              const SizedBox(width: 6),
                               Expanded(
                                 child: ElevatedButton.icon(
                                   style: ElevatedButton.styleFrom(
@@ -588,11 +595,14 @@ class _ComplaintDetailsScreenState extends State<ComplaintDetailsScreen> {
                                         ? const Color(0xFF334155)
                                         : const Color(0xFF10B981),
                                     foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(vertical: 10),
+                                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                   ),
                                   icon: const Icon(Icons.check_circle_outline, size: 16),
-                                  label: const Text('Solve', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                                  label: const FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    child: Text('Solve', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                                  ),
                                   onPressed: (_isActionInProgress || _complaint.status == 'SOLVED')
                                       ? null
                                       : () => _promptAdminStatusUpdate('SOLVED'),
@@ -906,24 +916,28 @@ class _ComplaintDetailsScreenState extends State<ComplaintDetailsScreen> {
                   ],
                 if (isOwner) ...[
                   const SizedBox(height: 20),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppTheme.priorityCritical,
-                        side: const BorderSide(color: AppTheme.priorityCritical),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppTheme.priorityCritical,
+                            side: const BorderSide(color: AppTheme.priorityCritical),
+                            minimumSize: const Size(0, 48),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          icon: const Icon(Icons.delete_outline),
+                          label: const Text(
+                            'DELETE THIS COMPLAINT',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                          ),
+                          onPressed: _isActionInProgress ? null : _confirmAndDelete,
                         ),
                       ),
-                      icon: const Icon(Icons.delete_outline),
-                      label: const Text(
-                        'DELETE THIS COMPLAINT',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                      ),
-                      onPressed: _isActionInProgress ? null : _confirmAndDelete,
-                    ),
+                    ],
                   ),
                 ],
               ],

@@ -7,6 +7,13 @@ import 'features/splash/screens/splash_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Log all flutter errors to console/logcat
+  FlutterError.onError = (FlutterErrorDetails details) {
+    FlutterError.presentError(details);
+    debugPrint('=== FLUTTER_ERROR ===: ${details.exceptionAsString()}');
+    debugPrint(details.stack?.toString());
+  };
   try {
     await SupabaseService.initialize();
   } catch (e) {

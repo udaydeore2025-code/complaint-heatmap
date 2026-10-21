@@ -87,6 +87,74 @@ class _InteractiveOsmCardState extends State<InteractiveOsmCard> {
 
   @override
   Widget build(BuildContext context) {
+    final bool isValidCoords = widget.latitude >= -90.0 &&
+        widget.latitude <= 90.0 &&
+        widget.longitude >= -180.0 &&
+        widget.longitude <= 180.0 &&
+        !widget.latitude.isNaN &&
+        !widget.longitude.isNaN;
+
+    if (!isValidCoords) {
+      return _buildFallbackCard(context, 'Invalid GPS coordinates');
+    }
+
+    try {
+      return _buildMapCard(context);
+    } catch (e) {
+      debugPrint('Notice: Error building InteractiveOsmCard: $e');
+      return _buildFallbackCard(context, 'Interactive map view unavailable');
+    }
+  }
+
+  Widget _buildFallbackCard(BuildContext context, String reason) {
+    return Container(
+      height: widget.height,
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.map_outlined, size: 36, color: Color(0xFF94A3B8)),
+            const SizedBox(height: 8),
+            Text(
+              reason,
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Color(0xFF475569)),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Lat: ${widget.latitude.toStringAsFixed(6)}, Lng: ${widget.longitude.toStringAsFixed(6)}',
+              style: const TextStyle(fontFamily: 'monospace', fontSize: 11, color: Color(0xFF64748B)),
+            ),
+            const SizedBox(height: 12),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF1E40AF),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              ),
+              icon: const Icon(Icons.navigation, size: 14),
+              label: const Text('Open in Navigation', style: TextStyle(fontSize: 12)),
+              onPressed: () {
+                MapLauncherService.navigateToCoordinates(
+                  latitude: widget.latitude,
+                  longitude: widget.longitude,
+                  title: widget.title,
+                  context: context,
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMapCard(BuildContext context) {
     final target = LatLng(widget.latitude, widget.longitude);
     final markerColor = _getMarkerColor();
 
@@ -215,7 +283,13 @@ class _InteractiveOsmCardState extends State<InteractiveOsmCard> {
                       _buildFloatingAction(
                         icon: Icons.my_location,
                         tooltip: 'Center on Pin',
-                        onTap: () => _mapController.move(target, 16.5),
+                        onTap: () {
+                          try {
+                            _mapController.move(target, 16.5);
+                          } catch (e) {
+                            debugPrint('Recenter notice: $e');
+                          }
+                        },
                       ),
                       const SizedBox(height: 6),
                       // Zoom In
@@ -223,8 +297,12 @@ class _InteractiveOsmCardState extends State<InteractiveOsmCard> {
                         icon: Icons.add,
                         tooltip: 'Zoom In',
                         onTap: () {
-                          final currentZoom = _mapController.camera.zoom;
-                          _mapController.move(_mapController.camera.center, currentZoom + 1);
+                          try {
+                            final currentZoom = _mapController.camera.zoom;
+                            _mapController.move(_mapController.camera.center, currentZoom + 1);
+                          } catch (e) {
+                            debugPrint('Zoom In notice: $e');
+                          }
                         },
                       ),
                       const SizedBox(height: 6),
@@ -233,8 +311,12 @@ class _InteractiveOsmCardState extends State<InteractiveOsmCard> {
                         icon: Icons.remove,
                         tooltip: 'Zoom Out',
                         onTap: () {
-                          final currentZoom = _mapController.camera.zoom;
-                          _mapController.move(_mapController.camera.center, currentZoom - 1);
+                          try {
+                            final currentZoom = _mapController.camera.zoom;
+                            _mapController.move(_mapController.camera.center, currentZoom - 1);
+                          } catch (e) {
+                            debugPrint('Zoom Out notice: $e');
+                          }
                         },
                       ),
                     ],
@@ -283,21 +365,25 @@ class _InteractiveOsmCardState extends State<InteractiveOsmCard> {
 
           // Action Toolbar below Map
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             color: const Color(0xFFF8FAFC),
             child: Row(
               children: [
                 Expanded(
+                  flex: 3,
                   child: OutlinedButton.icon(
                     style: OutlinedButton.styleFrom(
                       foregroundColor: const Color(0xFF1E40AF),
                       side: const BorderSide(color: Color(0xFFBFDBFE)),
                       backgroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     ),
-                    icon: const Icon(Icons.navigation, size: 15),
-                    label: const Text('Navigate (GPS)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                    icon: const Icon(Icons.navigation, size: 14),
+                    label: const FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text('Navigate (GPS)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                    ),
                     onPressed: () {
                       MapLauncherService.navigateToCoordinates(
                         latitude: widget.latitude,
@@ -308,29 +394,37 @@ class _InteractiveOsmCardState extends State<InteractiveOsmCard> {
                     },
                   ),
                 ),
-                const SizedBox(width: 8),
-                OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF334155),
-                    side: const BorderSide(color: Color(0xFFCBD5E1)),
-                    backgroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                const SizedBox(width: 6),
+                Expanded(
+                  flex: 2,
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF334155),
+                      side: const BorderSide(color: Color(0xFFCBD5E1)),
+                      backgroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    icon: const Icon(Icons.open_in_browser, size: 14),
+                    label: const FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text('OSM Web', style: TextStyle(fontSize: 11)),
+                    ),
+                    onPressed: () {
+                      MapLauncherService.openInOpenStreetMap(
+                        latitude: widget.latitude,
+                        longitude: widget.longitude,
+                        context: context,
+                      );
+                    },
                   ),
-                  icon: const Icon(Icons.open_in_browser, size: 15),
-                  label: const Text('OSM Web', style: TextStyle(fontSize: 11)),
-                  onPressed: () {
-                    MapLauncherService.openInOpenStreetMap(
-                      latitude: widget.latitude,
-                      longitude: widget.longitude,
-                      context: context,
-                    );
-                  },
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 4),
                 IconButton(
                   tooltip: 'Copy Coordinates',
                   icon: const Icon(Icons.copy_rounded, size: 18, color: Color(0xFF64748B)),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                   onPressed: () {
                     final coords = '${widget.latitude.toStringAsFixed(6)}, ${widget.longitude.toStringAsFixed(6)}';
                     Clipboard.setData(ClipboardData(text: coords));
