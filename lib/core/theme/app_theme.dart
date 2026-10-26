@@ -14,6 +14,18 @@ class AppTheme {
   static const Color priorityHigh = Color(0xFFEA580C); // Orange
   static const Color priorityCritical = Color(0xFFDC2626); // Red
 
+  // Citizen Login Theme Palette
+  // Vanilla (#FFEBAF) & Moonstone (#4C9DB0)
+  static const Color citizenVanilla = Color(0xFFFFEBAF);
+  static const Color citizenMoonstone = Color(0xFF4C9DB0);
+  static const Color citizenMoonstoneDark = Color(0xFF236573);
+
+  // Admin Login Theme Palette
+  // Bisque (#FEE3C5) & Atlas Red (#82193A)
+  static const Color adminBisque = Color(0xFFFEE3C5);
+  static const Color adminAtlasRed = Color(0xFF82193A);
+  static const Color adminAtlasRedDark = Color(0xFF5A0E25);
+
   static ThemeData get lightTheme {
     final colorScheme = ColorScheme.fromSeed(
       seedColor: primaryColor,

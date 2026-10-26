@@ -44,7 +44,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
   RealtimeChannel? _realtimeChannel;
 
   String _selectedCategory = 'All';
-  ComplaintSortMode _sortMode = ComplaintSortMode.highestPriority;
+  ComplaintSortMode _sortMode = ComplaintSortMode.mostPriorityLikes;
 
   @override
   void initState() {
@@ -112,14 +112,16 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
 
   String _getSortLabel(ComplaintSortMode mode) {
     switch (mode) {
-      case ComplaintSortMode.nearMe:
-        return 'Near Me';
-      case ComplaintSortMode.latest:
-        return 'Latest';
-      case ComplaintSortMode.mostUpvoted:
-        return 'Most Upvoted';
+      case ComplaintSortMode.mostPriorityLikes:
+        return 'Most Priority Likes';
       case ComplaintSortMode.highestPriority:
         return 'Highest Priority';
+      case ComplaintSortMode.mostUpvoted:
+        return 'Most Upvoted';
+      case ComplaintSortMode.latest:
+        return 'Latest';
+      case ComplaintSortMode.nearMe:
+        return 'Near Me';
     }
   }
 
@@ -183,19 +185,26 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     return Scaffold(
       backgroundColor: AppTheme.surfaceColor,
       appBar: AppBar(
+        centerTitle: false,
+        titleSpacing: 8,
         title: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            const AppLogo(size: 34, showBadgeBackground: true),
-            const SizedBox(width: 10),
-            Expanded(
+            const AppLogo(size: 30, showBadgeBackground: true),
+            const SizedBox(width: 8),
+            Flexible(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   const Text(
                     AppConstants.appName,
-                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 19),
+                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
                   ),
                   Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
                         _currentLocation != null ? Icons.my_location : Icons.location_off_outlined,
@@ -203,14 +212,16 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                         color: _currentLocation != null ? AppTheme.primaryColor : const Color(0xFF94A3B8),
                       ),
                       const SizedBox(width: 4),
-                      Text(
-                        _currentLocation != null
-                            ? 'GPS active • Nearby prioritized'
-                            : 'GPS inactive • Sorting by Latest',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                          color: Color(0xFF64748B),
+                      Flexible(
+                        child: Text(
+                          _currentLocation != null ? 'GPS active' : 'GPS inactive',
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                            color: Color(0xFF64748B),
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
                         ),
                       ),
                     ],
@@ -223,6 +234,9 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
         actions: [
           IconButton(
             tooltip: 'Civic Map',
+            visualDensity: VisualDensity.compact,
+            padding: const EdgeInsets.symmetric(horizontal: 2),
+            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
             icon: const Icon(Icons.map_outlined),
             onPressed: () {
               Navigator.push(
@@ -238,6 +252,9 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
           ),
           IconButton(
             tooltip: 'My Reported Issues',
+            visualDensity: VisualDensity.compact,
+            padding: const EdgeInsets.symmetric(horizontal: 2),
+            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
             icon: const Icon(Icons.assignment_turned_in_outlined),
             onPressed: () {
               Navigator.push(
@@ -251,28 +268,10 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
             },
           ),
           IconButton(
-            tooltip: 'Profile',
-            icon: const Icon(Icons.account_circle_outlined),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (ctx) => ProfileScreen(
-                    profile: widget.profile,
-                    authRepository: _authRepository,
-                    complaintRepository: _complaintRepository,
-                  ),
-                ),
-              ).then((_) => _loadComplaints());
-            },
-          ),
-          IconButton(
-            tooltip: 'Refresh',
-            icon: const Icon(Icons.refresh),
-            onPressed: _initLocationAndFeed,
-          ),
-          IconButton(
             tooltip: 'Sign Out',
+            visualDensity: VisualDensity.compact,
+            padding: const EdgeInsets.symmetric(horizontal: 2),
+            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
             icon: const Icon(Icons.logout),
             onPressed: () async {
               final confirm = await showDialog<bool>(
@@ -323,30 +322,37 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  DropdownButton<ComplaintSortMode>(
-                    value: _sortMode,
-                    underline: const SizedBox.shrink(),
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.primaryColor,
+                  Expanded(
+                    child: DropdownButton<ComplaintSortMode>(
+                      value: _sortMode,
+                      isDense: true,
+                      isExpanded: true,
+                      underline: const SizedBox.shrink(),
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.primaryColor,
+                      ),
+                      items: ComplaintSortMode.values.map((mode) {
+                        return DropdownMenuItem(
+                          value: mode,
+                          child: Text(
+                            _getSortLabel(mode),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        );
+                      }).toList(),
+                      onChanged: (newMode) {
+                        if (newMode != null) {
+                          setState(() {
+                            _sortMode = newMode;
+                          });
+                          _loadComplaints();
+                        }
+                      },
                     ),
-                    items: ComplaintSortMode.values.map((mode) {
-                      return DropdownMenuItem(
-                        value: mode,
-                        child: Text(_getSortLabel(mode)),
-                      );
-                    }).toList(),
-                    onChanged: (newMode) {
-                      if (newMode != null) {
-                        setState(() {
-                          _sortMode = newMode;
-                        });
-                        _loadComplaints();
-                      }
-                    },
                   ),
-                  const Spacer(),
+                  const SizedBox(width: 12),
                   Text(
                     '${_complaints.length} issues',
                     style: const TextStyle(
@@ -586,6 +592,65 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
             }
           }
         },
+      ),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: 0,
+        height: 64,
+        onDestinationSelected: (idx) {
+          if (idx == 1) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (ctx) => ComplaintMapScreen(
+                  complaintRepository: _complaintRepository,
+                  initialPosition: _currentLocation,
+                ),
+              ),
+            ).then((_) => _loadComplaints());
+          } else if (idx == 2) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (ctx) => MyComplaintsScreen(
+                  complaintRepository: _complaintRepository,
+                ),
+              ),
+            ).then((_) => _loadComplaints());
+          } else if (idx == 3) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (ctx) => ProfileScreen(
+                  profile: widget.profile,
+                  authRepository: _authRepository,
+                  complaintRepository: _complaintRepository,
+                ),
+              ),
+            ).then((_) => _loadComplaints());
+          }
+        },
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.feed_outlined),
+            selectedIcon: Icon(Icons.feed),
+            label: 'Feed',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.map_outlined),
+            selectedIcon: Icon(Icons.map),
+            label: 'Civic Map',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.assignment_turned_in_outlined),
+            selectedIcon: Icon(Icons.assignment_turned_in),
+            label: 'My Issues',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.person_outline),
+            selectedIcon: Icon(Icons.person),
+            label: 'Profile',
+          ),
+        ],
       ),
     );
   }

@@ -93,7 +93,11 @@ class ComplaintCard extends StatelessWidget {
             // Top Row: Category + Status Badge + Priority Level
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
-              child: Row(
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                alignment: WrapAlignment.spaceBetween,
                 children: [
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -122,60 +126,64 @@ class ComplaintCard extends StatelessWidget {
                       ],
                     ),
                   ),
-                  const Spacer(),
-                  // Priority score & level
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: priorityColor.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: priorityColor.withValues(alpha: 0.4)),
-                    ),
-                    child: Text(
-                      '${complaint.priorityLevel} (${complaint.priorityScore.toStringAsFixed(0)})',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: priorityColor,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  // Status badge
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: statusColor.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      complaint.status,
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: statusColor,
-                      ),
-                    ),
-                  ),
-                  if (onDelete != null) ...[
-                    const SizedBox(width: 8),
-                    InkWell(
-                      onTap: onDelete,
-                      borderRadius: BorderRadius.circular(6),
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Priority score & level
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFFEE2E2),
+                          color: priorityColor.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: priorityColor.withValues(alpha: 0.4)),
+                        ),
+                        child: Text(
+                          '${complaint.priorityLevel} (${complaint.priorityScore.toStringAsFixed(0)})',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: priorityColor,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      // Status badge
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: statusColor.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(6),
                         ),
-                        child: const Icon(
-                          Icons.delete_outline,
-                          size: 16,
-                          color: AppTheme.priorityCritical,
+                        child: Text(
+                          complaint.status,
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: statusColor,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                      if (onDelete != null) ...[
+                        const SizedBox(width: 8),
+                        InkWell(
+                          onTap: onDelete,
+                          borderRadius: BorderRadius.circular(6),
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFEE2E2),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Icon(
+                              Icons.delete_outline,
+                              size: 16,
+                              color: AppTheme.priorityCritical,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -194,9 +202,9 @@ class ComplaintCard extends StatelessWidget {
                       color: Color(0xFF64748B),
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 6),
                   const Text('•', style: TextStyle(color: Color(0xFFCBD5E1), fontSize: 10)),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 6),
                   const Icon(Icons.person_outline, size: 13, color: Color(0xFF64748B)),
                   const SizedBox(width: 3),
                   Expanded(
@@ -206,11 +214,15 @@ class ComplaintCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
+                  const SizedBox(width: 6),
                   const Icon(Icons.access_time, size: 12, color: Color(0xFF94A3B8)),
-                  const SizedBox(width: 4),
-                  Text(
-                    complaint.formattedDateTime,
-                    style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                  const SizedBox(width: 3),
+                  Flexible(
+                    child: Text(
+                      complaint.formattedDateTime,
+                      style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 ],
               ),

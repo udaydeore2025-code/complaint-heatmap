@@ -3,6 +3,7 @@ import '../../../core/models/complaint.dart';
 import '../../../core/models/user_profile.dart';
 import '../../../core/repositories/admin_repository.dart';
 import '../../../core/repositories/auth_repository.dart';
+import '../../../core/repositories/complaint_repository.dart';
 import '../../../core/services/map_launcher_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../widgets/app_logo.dart';
@@ -33,6 +34,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   List<Complaint> _priorityQueue = [];
   bool _isLoading = true;
   String _selectedFilter = 'ALL';
+  ComplaintSortMode _sortMode = ComplaintSortMode.mostPriorityLikes;
 
   final List<String> _filters = [
     'ALL',
@@ -41,6 +43,21 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     'WORK IN PROGRESS',
     'SOLVED',
   ];
+
+  String _getSortLabel(ComplaintSortMode mode) {
+    switch (mode) {
+      case ComplaintSortMode.mostPriorityLikes:
+        return 'Most Priority Likes';
+      case ComplaintSortMode.highestPriority:
+        return 'Highest Priority';
+      case ComplaintSortMode.mostUpvoted:
+        return 'Most Upvoted';
+      case ComplaintSortMode.latest:
+        return 'Latest';
+      case ComplaintSortMode.nearMe:
+        return 'Near Me';
+    }
+  }
 
   @override
   void initState() {
@@ -56,6 +73,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       final summary = await _adminRepo.fetchDashboardSummary();
       final queue = await _adminRepo.fetchPriorityQueue(
         statusFilter: _selectedFilter == 'ALL' ? null : _selectedFilter,
+        sortMode: _sortMode,
       );
 
       if (!mounted) return;
@@ -226,22 +244,31 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     return Scaffold(
       backgroundColor: AppTheme.surfaceColor,
       appBar: AppBar(
+        titleSpacing: 8,
         title: const Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
             AppLogo(size: 32, showBadgeBackground: true),
-            SizedBox(width: 10),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Admin Console',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                Text(
-                  'CivicConnect Municipal Portal',
-                  style: TextStyle(fontSize: 11, color: Colors.white70),
-                ),
-              ],
+            SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Admin Console',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
+                  Text(
+                    'CivicConnect Municipal Portal',
+                    style: TextStyle(fontSize: 11, color: Colors.white70),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -431,6 +458,62 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                               fontSize: 12,
                               color: Color(0xFF64748B),
                               fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  // Sorting Dropdown Bar
+                  SliverToBoxAdapter(
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Text(
+                            'Sort:',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF64748B),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: DropdownButton<ComplaintSortMode>(
+                              value: _sortMode,
+                              isDense: true,
+                              isExpanded: true,
+                              underline: const SizedBox.shrink(),
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: AppTheme.primaryColor,
+                              ),
+                              items: ComplaintSortMode.values.map((mode) {
+                                return DropdownMenuItem(
+                                  value: mode,
+                                  child: Text(
+                                    _getSortLabel(mode),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                );
+                              }).toList(),
+                              onChanged: (newMode) {
+                                if (newMode != null) {
+                                  setState(() {
+                                    _sortMode = newMode;
+                                  });
+                                  _loadDashboardData();
+                                }
+                              },
                             ),
                           ),
                         ],

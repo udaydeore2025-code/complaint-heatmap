@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:complaint_heatmap/main.dart';
 import 'package:complaint_heatmap/core/constants/app_constants.dart';
+import 'package:complaint_heatmap/core/theme/app_theme.dart';
 import 'package:complaint_heatmap/core/models/complaint.dart';
 import 'package:complaint_heatmap/core/models/complaint_update.dart';
 import 'package:complaint_heatmap/core/models/user_profile.dart';
@@ -131,7 +132,7 @@ class FakeComplaintRepository extends ComplaintRepository {
   Future<List<Complaint>> fetchComplaints({
     String? categoryFilter,
     UserPosition? userLocation,
-    ComplaintSortMode sortMode = ComplaintSortMode.highestPriority,
+    ComplaintSortMode sortMode = ComplaintSortMode.mostPriorityLikes,
   }) async {
     return List<Complaint>.from(feedComplaints);
   }
@@ -173,7 +174,10 @@ class FakeAdminRepository extends AdminRepository {
   }
 
   @override
-  Future<List<Complaint>> fetchPriorityQueue({String? statusFilter}) async {
+  Future<List<Complaint>> fetchPriorityQueue({
+    String? statusFilter,
+    ComplaintSortMode sortMode = ComplaintSortMode.mostPriorityLikes,
+  }) async {
     return [
       Complaint(
         id: 'comp-admin-1',
@@ -476,6 +480,8 @@ void main() {
     expect(find.text('Pending Review'), findsOneWidget);
     expect(find.text('4'), findsOneWidget);
     expect(find.text('Priority Queue'), findsOneWidget);
+    expect(find.text('Sort:'), findsOneWidget);
+    expect(find.text('Most Priority Likes'), findsOneWidget);
     expect(find.text('Dangerous crater on expressway lane.'), findsOneWidget);
     expect(find.text('CRITICAL (88.5)'), findsOneWidget);
   });
@@ -617,6 +623,117 @@ void main() {
     expect(list.last.priorityScore, 25.0);
   });
 
+  test('Most Priority Likes sorting places complaints with the most likes on top in descending order', () {
+    final list = [
+      Complaint(
+        id: '1',
+        userId: 'u1',
+        category: 'Streetlight',
+        description: 'Post with 1 like',
+        latitude: 18.0,
+        longitude: 73.0,
+        severity: 'LOW',
+        priorityScore: 35.0,
+        priorityLevel: 'LOW',
+        status: 'PENDING',
+        upvoteCount: 1,
+        downvoteCount: 0,
+        createdAt: DateTime(2025, 1, 1),
+        updatedAt: DateTime(2025, 1, 1),
+      ),
+      Complaint(
+        id: '2',
+        userId: 'u2',
+        category: 'Garbage',
+        description: 'Post with 5 likes (Top)',
+        latitude: 18.0,
+        longitude: 73.0,
+        severity: 'MEDIUM',
+        priorityScore: 50.0,
+        priorityLevel: 'MEDIUM',
+        status: 'PENDING',
+        upvoteCount: 5,
+        downvoteCount: 0,
+        createdAt: DateTime(2025, 1, 2),
+        updatedAt: DateTime(2025, 1, 2),
+      ),
+      Complaint(
+        id: '3',
+        userId: 'u3',
+        category: 'Pothole',
+        description: 'Post with 3 likes and high priority',
+        latitude: 18.0,
+        longitude: 73.0,
+        severity: 'HIGH',
+        priorityScore: 70.0,
+        priorityLevel: 'HIGH',
+        status: 'PENDING',
+        upvoteCount: 3,
+        downvoteCount: 0,
+        createdAt: DateTime(2025, 1, 3),
+        updatedAt: DateTime(2025, 1, 3),
+      ),
+      Complaint(
+        id: '4',
+        userId: 'u4',
+        category: 'Water Supply',
+        description: 'Post with 3 likes and medium priority',
+        latitude: 18.0,
+        longitude: 73.0,
+        severity: 'MEDIUM',
+        priorityScore: 40.0,
+        priorityLevel: 'MEDIUM',
+        status: 'PENDING',
+        upvoteCount: 3,
+        downvoteCount: 0,
+        createdAt: DateTime(2025, 1, 4),
+        updatedAt: DateTime(2025, 1, 4),
+      ),
+      Complaint(
+        id: '5',
+        userId: 'u5',
+        category: 'Other',
+        description: 'Post with 0 likes',
+        latitude: 18.0,
+        longitude: 73.0,
+        severity: 'LOW',
+        priorityScore: 30.0,
+        priorityLevel: 'LOW',
+        status: 'PENDING',
+        upvoteCount: 0,
+        downvoteCount: 0,
+        createdAt: DateTime(2025, 1, 5),
+        updatedAt: DateTime(2025, 1, 5),
+      ),
+    ];
+
+    list.sort((a, b) {
+      final likeCmp = b.upvoteCount.compareTo(a.upvoteCount);
+      if (likeCmp != 0) return likeCmp;
+      final netA = a.upvoteCount - a.downvoteCount;
+      final netB = b.upvoteCount - b.downvoteCount;
+      final netCmp = netB.compareTo(netA);
+      if (netCmp != 0) return netCmp;
+      final prioCmp = b.priorityScore.compareTo(a.priorityScore);
+      if (prioCmp != 0) return prioCmp;
+      return b.createdAt.compareTo(a.createdAt);
+    });
+
+    // Verify descending order
+    expect(list[0].id, '2'); // 5 likes
+    expect(list[0].upvoteCount, 5);
+    expect(list[1].id, '3'); // 3 likes, priority 70
+    expect(list[1].upvoteCount, 3);
+    expect(list[1].priorityScore, 70.0);
+    expect(list[2].id, '4'); // 3 likes, priority 40
+    expect(list[2].upvoteCount, 3);
+    expect(list[2].priorityScore, 40.0);
+    expect(list[3].id, '1'); // 1 like
+    expect(list[3].upvoteCount, 1);
+    expect(list[4].id, '5'); // 0 likes
+    expect(list[4].upvoteCount, 0);
+  });
+
   testWidgets('ComplaintDetailsScreen renders delete options when user is owner and executes delete', (WidgetTester tester) async {
     final complaint = Complaint(
       id: 'comp-owner-1',
@@ -732,6 +849,35 @@ void main() {
     // In admin mode, passkey field is clearly present
     expect(find.text('Municipal Staff Passkey'), findsOneWidget);
     expect(find.text('Staff Passkey: CIVIC-ADMIN-2026'), findsOneWidget);
+  });
+
+  testWidgets('EmailLoginScreen applies Vanilla & Moonstone for Citizen and Bisque & Atlas Red for Admin', (WidgetTester tester) async {
+    final fakeAuth = FakeAuthRepository();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: EmailLoginScreen(authRepository: fakeAuth),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // In Citizen mode:
+    final citizenAppBar = tester.widget<AppBar>(find.byType(AppBar));
+    expect(citizenAppBar.backgroundColor, equals(AppTheme.citizenMoonstone));
+
+    final sendOtpButton = tester.widget<ElevatedButton>(find.widgetWithText(ElevatedButton, 'SEND OTP'));
+    expect(sendOtpButton.style?.backgroundColor?.resolve({}), equals(AppTheme.citizenMoonstone));
+
+    // Switch to Admin mode
+    await tester.tap(find.text('Admin Login'));
+    await tester.pumpAndSettle();
+
+    final adminAppBar = tester.widget<AppBar>(find.byType(AppBar));
+    expect(adminAppBar.backgroundColor, equals(AppTheme.adminAtlasRed));
+
+    final sendAdminOtpButton = tester.widget<ElevatedButton>(find.widgetWithText(ElevatedButton, 'SEND ADMIN OTP'));
+    expect(sendAdminOtpButton.style?.backgroundColor?.resolve({}), equals(AppTheme.adminAtlasRed));
+    expect(sendAdminOtpButton.style?.foregroundColor?.resolve({}), equals(AppTheme.adminBisque));
   });
 
   testWidgets('AdminDashboardScreen renders quick action buttons Verify, In Progress, Solve directly on complaint card', (WidgetTester tester) async {
@@ -1312,5 +1458,47 @@ void main() {
     expect(find.text('Exact Location & Coordinates'), findsOneWidget);
     expect(find.text('Administrative Actions'), findsOneWidget);
     expect(find.text('DELETE COMPLAINT AS ADMIN'), findsOneWidget);
+  });
+
+  testWidgets('HomeFeedScreen renders without overflow on compact mobile screen width (360x780)', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(360, 780);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    LocationService.mockLocation = const UserPosition(latitude: 18.5204, longitude: 73.8567);
+    addTearDown(() => LocationService.mockLocation = null);
+
+    final citizenUser = UserProfile(
+      id: 'citizen-compact-101',
+      email: 'compact@example.com',
+      name: 'Compact Test User',
+      role: 'citizen',
+      createdAt: DateTime.now(),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: HomeFeedScreen(
+          profile: citizenUser,
+          complaintRepository: FakeComplaintRepository(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Verify AppBar and NavigationBar render cleanly without overflow on 360-wide screen
+    expect(find.text(AppConstants.appName), findsOneWidget);
+    expect(find.byType(AppBar), findsOneWidget);
+    expect(find.widgetWithIcon(IconButton, Icons.logout), findsOneWidget);
+    expect(find.widgetWithIcon(IconButton, Icons.map_outlined), findsOneWidget);
+    expect(find.widgetWithIcon(IconButton, Icons.assignment_turned_in_outlined), findsOneWidget);
+    expect(find.byType(NavigationBar), findsOneWidget);
+    expect(find.byIcon(Icons.person_outline), findsOneWidget);
+
+    // Verify no RenderFlex overflow exception
+    expect(tester.takeException(), isNull);
   });
 }

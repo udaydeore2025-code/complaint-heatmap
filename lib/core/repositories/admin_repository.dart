@@ -4,6 +4,7 @@ import '../constants/supabase_constants.dart';
 import '../models/complaint.dart';
 import '../models/complaint_update.dart';
 import '../models/location_group.dart';
+import '../repositories/complaint_repository.dart';
 import '../services/supabase_service.dart';
 
 class AdminSummary {
@@ -87,8 +88,11 @@ class AdminRepository {
     }
   }
 
-  /// Fetches complaints ordered from highest to lowest priority score
-  Future<List<Complaint>> fetchPriorityQueue({String? statusFilter}) async {
+  /// Fetches complaints ordered from highest to lowest priority score or likes
+  Future<List<Complaint>> fetchPriorityQueue({
+    String? statusFilter,
+    ComplaintSortMode sortMode = ComplaintSortMode.mostPriorityLikes,
+  }) async {
     try {
       var query = client.from(SupabaseConstants.complaintsTable).select();
 
@@ -156,7 +160,7 @@ class AdminRepository {
         }
       }
 
-      return rows.map((r) {
+      final list = rows.map((r) {
         final id = r['id'] as String;
         final complaint = Complaint.fromJson(r as Map<String, dynamic>);
         final uId = complaint.userId;
@@ -168,6 +172,55 @@ class AdminRepository {
           confirmationCount: confMap[id] ?? 0,
         );
       }).toList();
+
+      switch (sortMode) {
+        case ComplaintSortMode.mostPriorityLikes:
+          list.sort((a, b) {
+            // 1. Primary: Most likes / upvotes in descending order
+            final likeCmp = b.upvoteCount.compareTo(a.upvoteCount);
+            if (likeCmp != 0) return likeCmp;
+
+            // 2. Secondary: Net votes (upvotes - downvotes) in descending order
+            final netA = a.upvoteCount - a.downvoteCount;
+            final netB = b.upvoteCount - b.downvoteCount;
+            final netCmp = netB.compareTo(netA);
+            if (netCmp != 0) return netCmp;
+
+            // 3. Tertiary: Priority score in descending order
+            final prioCmp = b.priorityScore.compareTo(a.priorityScore);
+            if (prioCmp != 0) return prioCmp;
+
+            // 4. Quaternary: Most recent
+            return b.createdAt.compareTo(a.createdAt);
+          });
+          break;
+        case ComplaintSortMode.highestPriority:
+          list.sort((a, b) {
+            final cmp = b.priorityScore.compareTo(a.priorityScore);
+            if (cmp != 0) return cmp;
+            final likeCmp = b.upvoteCount.compareTo(a.upvoteCount);
+            if (likeCmp != 0) return likeCmp;
+            return b.createdAt.compareTo(a.createdAt);
+          });
+          break;
+        case ComplaintSortMode.mostUpvoted:
+          list.sort((a, b) {
+            final likeCmp = b.upvoteCount.compareTo(a.upvoteCount);
+            if (likeCmp != 0) return likeCmp;
+            final scoreA = a.upvoteCount - a.downvoteCount;
+            final scoreB = b.upvoteCount - b.downvoteCount;
+            final netCmp = scoreB.compareTo(scoreA);
+            if (netCmp != 0) return netCmp;
+            return b.priorityScore.compareTo(a.priorityScore);
+          });
+          break;
+        case ComplaintSortMode.latest:
+        case ComplaintSortMode.nearMe:
+          list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          break;
+      }
+
+      return list;
     } catch (e) {
       debugPrint('Error fetching priority queue: $e');
       return [];

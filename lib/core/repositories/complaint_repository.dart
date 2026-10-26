@@ -10,10 +10,11 @@ import '../services/priority_calculator.dart';
 import '../services/supabase_service.dart';
 
 enum ComplaintSortMode {
-  nearMe,
-  latest,
-  mostUpvoted,
+  mostPriorityLikes,
   highestPriority,
+  mostUpvoted,
+  latest,
+  nearMe,
 }
 
 class ComplaintRepository {
@@ -305,7 +306,7 @@ class ComplaintRepository {
   Future<List<Complaint>> fetchComplaints({
     String? categoryFilter,
     UserPosition? userLocation,
-    ComplaintSortMode sortMode = ComplaintSortMode.highestPriority,
+    ComplaintSortMode sortMode = ComplaintSortMode.mostPriorityLikes,
   }) async {
     try {
       final currentUserId = client.auth.currentUser?.id;
@@ -425,6 +426,26 @@ class ComplaintRepository {
 
       // 5. Apply selected sort mode
       switch (sortMode) {
+        case ComplaintSortMode.mostPriorityLikes:
+          complaints.sort((a, b) {
+            // 1. Primary: Most likes / upvotes in descending order
+            final likeCmp = b.upvoteCount.compareTo(a.upvoteCount);
+            if (likeCmp != 0) return likeCmp;
+
+            // 2. Secondary: Net votes (upvotes - downvotes) in descending order
+            final netA = a.upvoteCount - a.downvoteCount;
+            final netB = b.upvoteCount - b.downvoteCount;
+            final netCmp = netB.compareTo(netA);
+            if (netCmp != 0) return netCmp;
+
+            // 3. Tertiary: Priority score in descending order
+            final prioCmp = b.priorityScore.compareTo(a.priorityScore);
+            if (prioCmp != 0) return prioCmp;
+
+            // 4. Quaternary: Most recent
+            return b.createdAt.compareTo(a.createdAt);
+          });
+          break;
         case ComplaintSortMode.nearMe:
           complaints.sort((a, b) {
             if (a.distanceMeters == null && b.distanceMeters == null) return 0;
@@ -438,15 +459,21 @@ class ComplaintRepository {
           break;
         case ComplaintSortMode.mostUpvoted:
           complaints.sort((a, b) {
+            final likeCmp = b.upvoteCount.compareTo(a.upvoteCount);
+            if (likeCmp != 0) return likeCmp;
             final scoreA = a.upvoteCount - a.downvoteCount;
             final scoreB = b.upvoteCount - b.downvoteCount;
-            return scoreB.compareTo(scoreA);
+            final netCmp = scoreB.compareTo(scoreA);
+            if (netCmp != 0) return netCmp;
+            return b.priorityScore.compareTo(a.priorityScore);
           });
           break;
         case ComplaintSortMode.highestPriority:
           complaints.sort((a, b) {
             final cmp = b.priorityScore.compareTo(a.priorityScore);
             if (cmp != 0) return cmp;
+            final likeCmp = b.upvoteCount.compareTo(a.upvoteCount);
+            if (likeCmp != 0) return likeCmp;
             return b.createdAt.compareTo(a.createdAt);
           });
           break;
